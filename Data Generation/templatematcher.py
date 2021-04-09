@@ -1,54 +1,71 @@
 import numpy as np
 import pandas as pd
-from skimage.feature import match_template
+import cv2
+from json_to_dataset import JsonToCSV
+from datagenerator import DataGenerator
+from iou import bb_intersection_over_union
 
 class TemplateMatcher:
 
     """ Template Matching """
 
-    def __init__(self,data,label_name,num_object=1,slack=0):
+    def __init__(self,json_file,slack=0):
 
         """
         Params:
 
-        data --> PANDAS.DATAFRAME. Dataset containing the template information
+        json_file --> JSON file created using labelme.
         label_name --> INT or STRING. Label_name for which Template Matching will be used
-        num_object --> INT. Number of objects to be tracked.
         slack --> INT. Variable to adjust the bounding box
 
         """
 
-        self.data=data
-        self.label_name=label_name            
-        self.num_object=num_object
+        self.json=json_file
         self.slack=slack
 
-        # If label index is provided, we need the label name.
-        if type(self.label_index)==int:
-            self.label_name=self.data['label'].unique[self.label_name]
+        # Transform the JSON to CSV
+        json2csv=JsonToCSV(self.json_file)
 
+        # Saving the original Image File
+        self.image=np.asarray(json2csv.image,dtype=np.uint8)
+
+        # Obtaining The dataset
+        self.data=json2csv.dataset        
 
     
-    def find_template(self,image,template):
-        """ Find the xy coordinates for the template in image"""
+    def find_all_template(self,image,template,method=cv2.TM_CCOEFF_NORMED,threshold):
+        """ Find all the the boxes for the template in image """
 
-        result=match_template(image,template)
-        ij = np.unravel_index(np.argmax(result), result.shape)
-        x, y = ij[::-1]
+       self.w,self.h=template.shape[::-1]
+       self.res=cv2.matchTemplate(image,template,method=method)
+       self.loc = np.where( res >= threshold)
 
-        return x,y
+        # Apply Non Max Suppression to delete Overlapping boxes
+        self.boxes=[]
+        for pt in zip(*self.loc[::-1]):
+            self.boxes.append(pt)
+
+       self.boxes=self.non_max_suppression(sorted(self.boxes))
+       return self.boxes
     
-    def find_all_template(self,image,template):
-        """ Find all the xy coordinates for the template in image """
+    def create_boxes(self,box):
+        return [[box[0],box[1]],[box[0]+self.w,box[1]+self.h]]
 
-        bbox=self.data[self.data['label']=self.label_name]['bbox']
-        x_axis=[bbox[0][0],bbox[1][0]]
-        y_axis=[bbox[1][0],bbox[1][1]]
-
-        height=y_axis[1]-y_axis[1]+self.slack
-        width=x_axis[1]-x_axis[0]-196+self.slack
-        i=0
-        boxes=[]
+    def non_max_suppression(self,boxes):
+        new_boxes=[boxes[0]]
+        box=self.create_boxes(new_boxes[-1])
+        
+        for b in boxes:
+            present_box=self.create_boxes(b)
+            if bb_intersection_over_union(box,present_box)<0.001:
+                new_boxes.append(b)
+                box=self.create_boxes(b)
+        return new_boxes
     
-    def plot_image(self,image,boxes=[])
+    def plot_image(self,figsize=(20,20)):
+        for pt in zip(*loc[::-1]):
+            cv2.rectangle(self.image, pt, (pt[0] + h, pt[1] + w), (0,255,255), 2)
+        plt.figure(figsize=figsize)
+        plt.imshow(self.image,cmap="gray")
+
         
