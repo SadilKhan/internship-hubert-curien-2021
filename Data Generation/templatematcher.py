@@ -8,7 +8,7 @@ from json_to_dataset import JsonToCSV
 from datagenerator import DataGenerator
 from iou import bb_intersection_over_union
 
-class TemplateMatcher(DataGenerator,JsonToCSV):
+class TemplateMatcher(DataGenerator):
 
     """ Template Matching """
 
