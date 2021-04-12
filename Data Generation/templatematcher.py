@@ -19,15 +19,17 @@ class TemplateMatcher(DataGenerator):
         Params:
 
         json_file --> JSON file created using labelme.
-        slack_w --> INT. Variable to adjust the width of bounding box.
-        slack_h --> INT. Variable to adjust the height of bounding box.
+        slack_w --> LIST. Variable to adjust the width of bounding box.
+        slack_h --> LIST. Variable to adjust the height of bounding box.
         """
 
         self.json_file=json_file
-        self.slack_w_left=slack_w[0]
-        self.slack_w_right=slack_w[1]
-        self.slack_h_up=slack_h[0]
-        self.slack_h_bottom=slack_h[1]
+        self.slack_w=slack_w
+        self.slack_h=slack_h
+        self.slack_w_left=self.slack_w[0]
+        self.slack_w_right=self.slack_w[1]
+        self.slack_h_up=self.slack_h[0]
+        self.slack_h_bottom=self.slack_h[1]
 
         # Transform the JSON to CSV
         json2csv=JsonToCSV(self.json_file)
@@ -47,6 +49,10 @@ class TemplateMatcher(DataGenerator):
         self.height=dict()
         self.width=dict()
 
+
+        # Print the Arguments
+        print(f"TemplateMatcher(json_file={self.json_file},slack_w={self.lack_w},slack_h={self.slack_h")
+
     def match_template(self,label,threshold):
         """ Template Matcher for Any Label """
         # Creating a dictionary for storing boxes for all images
@@ -63,8 +69,8 @@ class TemplateMatcher(DataGenerator):
             # The image template that we need to match
             template=self.image[bbox[0][1]:bbox[1][1],bbox[0][0]:bbox[1][0]]
             w,h=template.shape[::-1]
-            self.height[l]=h
-            self.width[l]=w
+            self.height[l]=h+self.slack_h_bottom
+            self.width[l]=w+self.slack_w_right
 
 
             # All the detected objects for the template
@@ -73,23 +79,32 @@ class TemplateMatcher(DataGenerator):
     
     def find_all_template(self,template,threshold=0.25,method=cv2.TM_CCOEFF_NORMED):
         """ Find all the the boxes for the template in image """
+
         self.w,self.h=template.shape[::-1]
+        self.w=self.w+self.slack_w_right
+        self.h=self.h+self.slack_h_bottom
+
         self.res=cv2.matchTemplate(self.image,template,method=method)
         self.loc = np.where(self.res >= threshold)
 
         # Apply Non Max Suppression to delete Overlapping boxes
         self.boxes=[]
         for pt in zip(*self.loc[::-1]):
-            pt=(pt[0]-self.slack_w,pt[1]+self.slack_h)
+            pt=(pt[0]+self.slack_w_left,pt[1]+self.slack_h_up)
             self.boxes.append(pt)
 
         self.boxes=self.non_max_suppression(sorted(self.boxes))
         return self.boxes
     
     def create_boxes(self,box):
+        """ Create box coordinate from array of corner points """
+
         return [[box[0],box[1]],[box[0]+self.w,box[1]+self.h]]
 
     def non_max_suppression(self,boxes):
+
+        """ Perform Non-Max Suppression for optimal bounding boxes"""
+
         new_boxes=[boxes[0]]
         box=self.create_boxes(new_boxes[-1])
         
@@ -101,6 +116,9 @@ class TemplateMatcher(DataGenerator):
         return new_boxes
     
     def plot_image(self,figsize=(20,20)):
+
+        """ Plot the Image with the bounding boxes """
+
         for k in self.all_labels:
             box_k=self.all_boxes[k]
             h=self.height[k]
@@ -114,30 +132,35 @@ class TemplateMatcher(DataGenerator):
 
     def save_json(self,name,json_file):
 
-        for key in list(json_file.keys()):
-            json_file[key]=str(json_file[key])
-        with open(name,"w+") as f:
-            json.dump(json_file,f)
+        """ Save the dictionary to JSON that is Labelme readable """
+
+        pass
 
     def save_csv(self,dir_name,dict_data):
 
-        """ Save the file in the CSV """
+        """ Save the file in the CSV format """
+
         pass
-
-
-
-
 
 
 
 if __name__=="__main__":
 
-    """if sys.arg"""
+    if len(sys.argv)<2:
+        print("\nJson_Directory : STRING, The Directory file for Json File,\n")
+        print("Threshold: FLOAT, The threshold value for matchTemplate. Lower the value, more bounding boxes. Default 0.25\n")
+        print("Plot Image: BOOLEAN, plot the image with the bounding boxes. Default True\n")
+        print("slack_w(Optional): LIST, Parameter to adjust the width of the bounding box. Type - for default value\n")
+        print("slack_w(Optional): LIST, Parameter to adjust the height of the bounding box. Type - for default value\n ")
+        print("Label: STRING or INT, The label for which the bounding boxes are to calculated. Default all.\n")
+        print("Save: JSON/CSV/FALSE, To save the bounding boxes in JSON or CSV. Default False\n")
 
-    tm=TemplateMatcher("/Users/ryzenx/Documents/Internship/Dataset/image2.json",slack_w=-10)
+    elif len(sys.argv)==2:
+        json_file=sys.argv[1]
+        tm=TemplateMatcher(json_file)
 
+        boxes=tm.match_template("all",0.25)
+        tm.plot_image()
 
-    boxes=tm.match_template("all",0.25)
-    #tm.save_json("automate.json",boxes)
-    tm.plot_image((10,10))    
+        tm.save_json()
         
