@@ -60,6 +60,11 @@ class TemplateMatcher(DataGenerator,JsonToCSV):
         """ Template Matcher for Any Label """
         # Creating a dictionary for storing boxes for all images
         self.all_boxes=dict() 
+        if label=="-":
+            label="all"
+        if threshold=="-":
+            threshold=0.25
+
         if label=="all":
             # Get All unique labels
             self.all_labels=list(self.data['label'].unique())
@@ -174,7 +179,7 @@ if __name__=="__main__":
         print("Threshold: FLOAT, The threshold value for matchTemplate. Lower the value, more bounding boxes. Default 0.25\n")
         print("Label: STRING or INT, The label for which the bounding boxes are to calculated. Default all.\n")
         print("Plot Image: BOOLEAN, plot the image with the bounding boxes. Default True\n")
-        print("Save: JSON/CSV/FALSE, To save the bounding boxes in JSON or CSV. Default False\n")
+        print("Save: JSON/FALSE, To save the bounding boxes in JSON. Default False\n")
         print("slack_w(Optional): LIST, Parameter to adjust the width of the bounding box. Type - for default value\n")
         print("slack_h(Optional): LIST, Parameter to adjust the height of the bounding box. Type - for default value\n ")
 
@@ -194,45 +199,60 @@ if __name__=="__main__":
         threshold=sys.argv[2]
         label=sys.argv[3]
         tm=TemplateMatcher(json_file)
-
-        if threshold=="-"
-            boxes=tm.match_template(label,0.25)
-        else:
-            boxes=tm.match_template(label,threshold)
+        boxes=tm.match_template(label,threshold)
 
     elif len(sys.argv)==5:
         json_file=sys.argv[1]
         threshold=sys.argv[2]
         label=sys.argv[3]
-        tm=TemplateMatcher(json_file,slack_w=slack_w)
-        if label ="-":
-            boxes=tm.match_template("all",threshold)
-        else:
-             boxes=tm.match_template(label,threshold)
+        tm=TemplateMatcher(json_file)
+        boxes=tm.match_template(label,threshold)
         tm.plot_image(figsize=(20,20))   
 
     elif len(sys.argv)==6:
         json_file=sys.argv[1]
         threshold=sys.argv[2]
         label=sys.argv[3]
+        plot=sys.argv[4]
+        save=sys.argv[5]
+        tm=TemplateMatcher(json_file)
+        boxes=tm.match_template(label,threshold=threshold)
+        if plot:
+            tm.plot_image(figsize=(20,20))
+        
+        if save:
+            tm.createJSON()
+
+    elif len(sys.argv)==7:
+        json_file=sys.argv[1]
+        threshold=sys.argv[2]
+        label=sys.argv[3]
+        plot=sys.argv[4]
+        save=sys.argv[5]
+        slack_w=sys.argv[6]
         tm=TemplateMatcher(json_file,slack_w=slack_w)
-        if label ="-":
-            boxes=tm.match_template("all",threshold)
-        else:
-             boxes=tm.match_template(label,threshold)
-        tm.plot_image(figsize=(20,20))   
+        boxes=tm.match_template(label,threshold=threshold)
+        if plot:
+            tm.plot_image(figsize=(20,20))
+        
+        if save:
+            tm.createJSON()
+    elif len(sys.argv)==7:
+        json_file=sys.argv[1]
+        threshold=sys.argv[2]
+        label=sys.argv[3]
+        plot=sys.argv[4]
+        save=sys.argv[5]
+        slack_w=sys.argv[6]
+        if slack_w=="-":
+            slack_w=[0,0]
+        slack_h=sys.argv[7]
+        tm=TemplateMatcher(json_file,slack_w=slack_w,slack_h=slack_h)
+        boxes=tm.match_template(label,threshold=threshold)
+        if plot:
+            tm.plot_image(figsize=(20,20))
+        
+        if save:
+            tm.createJSON() 
 
-       
-    
-
-    
-
-    
-
-    tm=TemplateMatcher("/Users/ryzenx/Documents/Internship/Dataset/image2.json",slack_w=[-10,20])
-    boxes=tm.match_template("3",0.25)
-    #tm.createJSON()
-
-    #tm.save_json("automate.json",boxes)
-    tm.plot_image((10,10))
         
