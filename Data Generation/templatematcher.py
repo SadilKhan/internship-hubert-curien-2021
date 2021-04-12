@@ -64,6 +64,8 @@ class TemplateMatcher(DataGenerator):
             label="all"
         if threshold=="-":
             threshold=0.25
+        else:
+            threshold=float(threshold)
 
         if label=="all":
             # Get All unique labels
@@ -207,7 +209,8 @@ if __name__=="__main__":
         label=sys.argv[3]
         tm=TemplateMatcher(json_file)
         boxes=tm.match_template(label,threshold)
-        tm.plot_image(figsize=(20,20))   
+        if sys.argv[4]=="True":
+            tm.plot_image(figsize=(20,20))   
 
     elif len(sys.argv)==6:
         json_file=sys.argv[1]
@@ -217,10 +220,10 @@ if __name__=="__main__":
         save=sys.argv[5]
         tm=TemplateMatcher(json_file)
         boxes=tm.match_template(label,threshold=threshold)
-        if plot:
+        if plot=="True":
             tm.plot_image(figsize=(20,20))
         
-        if save:
+        if save=="True":
             tm.createJSON()
 
     elif len(sys.argv)==7:
@@ -230,12 +233,14 @@ if __name__=="__main__":
         plot=sys.argv[4]
         save=sys.argv[5]
         slack_w=sys.argv[6]
+        slack_w = map(float, slack_w.strip('[]').split(','))
+
         tm=TemplateMatcher(json_file,slack_w=slack_w)
         boxes=tm.match_template(label,threshold=threshold)
-        if plot:
+        if plot=="True":
             tm.plot_image(figsize=(20,20))
         
-        if save:
+        if save=="False":
             tm.createJSON()
     elif len(sys.argv)==7:
         json_file=sys.argv[1]
@@ -246,13 +251,18 @@ if __name__=="__main__":
         slack_w=sys.argv[6]
         if slack_w=="-":
             slack_w=[0,0]
+        else:
+            slack_w = map(float, slack_w.strip('[]').split(','))
+
         slack_h=sys.argv[7]
+        slack_h = map(float, slack_h.strip('[]').split(','))
+        
         tm=TemplateMatcher(json_file,slack_w=slack_w,slack_h=slack_h)
         boxes=tm.match_template(label,threshold=threshold)
-        if plot:
+        if plot=="True":
             tm.plot_image(figsize=(20,20))
         
-        if save:
+        if save=="True":
             tm.createJSON() 
 
-        
+   
