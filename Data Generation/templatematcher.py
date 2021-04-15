@@ -94,8 +94,18 @@ class TemplateMatcher(DataGenerator):
         self.w=self.w+self.slack_w_right
         self.h=self.h+self.slack_h_bottom
 
-        self.res=cv2.matchTemplate(self.image,template,method=method)
+        bbox=self.data[self.data['label']==label]["bbox"].iloc[0]
+
+        # Restrict the search space
+        search_space=self.image[bbox[0][1]-100-0*self.h:bbox[1][1]+100+0*self.h,:]
+
+        # The starting coordintaes of the height.
+        h_start=bbox[0][1]-0*self.h-100
+
+
+        self.res=cv2.matchTemplate(search_space,template,method=method)
         self.loc = np.where(self.res >= threshold)
+        self.loc=(self.loc[0]+h_start,self.loc[1])
 
         # Apply Non Max Suppression to delete Overlapping boxes
         self.boxes=[]
@@ -103,6 +113,48 @@ class TemplateMatcher(DataGenerator):
             pt=(pt[0]+self.slack_w_left,pt[1]+self.slack_h_up)
             self.boxes.append(pt)
 
+
+        
+        """# Do several rotations of the template and find matches
+        template=np.array(self.rotate_image(template,45))
+        self.res=cv2.matchTemplate(self.image,template,method=method)
+        self.loc = np.where(self.res >= 0.35)
+        for pt in zip(*self.loc[::-1]):
+            pt=(pt[0]+self.slack_w_left,pt[1]+self.slack_h_up)
+            self.boxes.append(pt)
+
+
+        template=np.array(self.rotate_image(template,90))
+        self.res=cv2.matchTemplate(self.image,template,method=method)
+        self.loc = np.where(self.res >= 0.35)
+        for pt in zip(*self.loc[::-1]):
+            pt=(pt[0]+self.slack_w_left,pt[1]+self.slack_h_up)
+            self.boxes.append(pt)"""
+
+
+
+        # Flip image horizontally and vertically
+        """template=np.array(self.flip_image(template))
+        
+        self.res=cv2.matchTemplate(search_space,template,method=method)
+        self.loc = np.where(self.res >= 0.15)
+        self.loc=(self.loc[0]+h_start,self.loc[1])
+
+        for pt in zip(*self.loc[::-1]):
+            pt=(pt[0]+self.slack_w_left,pt[1]+self.slack_h_up)
+            self.boxes.append(pt)
+
+        
+        
+        template=np.array(self.mirror_image(template))
+        self.res=cv2.matchTemplate(search_space,template,method=method)
+        self.loc = np.where(self.res >= 0.15)
+
+        self.loc=(self.loc[0]+h_start,self.loc[1])
+        for pt in zip(*self.loc[::-1]):
+            pt=(pt[0]+self.slack_w_left,pt[1]+self.slack_h_up)
+            self.boxes.append(pt)"""
+        
         self.boxes=self.non_max_suppression(sorted(self.boxes))
         self.boxes=[self.create_boxes(i) for i in self.boxes]
         return self.boxes
@@ -114,19 +166,25 @@ class TemplateMatcher(DataGenerator):
 
     def non_max_suppression(self,boxes):
 
-        """ Perform Non-Max Suppression for optimal bounding boxes"""
+        """ Perform Non-Max Suppression for removing overlapping boxes"""
 
         new_boxes=[boxes[0]]
         box=self.create_boxes(new_boxes[-1])
         
         for b in boxes:
+            update=True
             present_box=self.create_boxes(b)
-            if bb_intersection_over_union(box,present_box)<0.001:
+            for bx in new_boxes:
+                box=self.create_boxes(bx)
+                if bb_intersection_over_union(box,present_box)>0.01:
+                    update=False
+                    break
+            if update:
                 new_boxes.append(b)
                 box=self.create_boxes(b)
         return new_boxes
     
-    def plot_image(self,figsize=(20,20)):
+    def plot(self,figsize=(20,20)):
 
         """ Plot the Image with the bounding boxes """
 
@@ -165,12 +223,6 @@ class TemplateMatcher(DataGenerator):
         # Store the json file.
         with open(self.json_file, 'w+') as fp:
             json.dump(self.labelmeData, fp,indent=2)
-
-    def save_csv(self,dir_name,dict_data):
-
-        """ Save the file in the CSV format """
-
-        pass
 
 
 
