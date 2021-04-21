@@ -99,12 +99,13 @@ class TemplateMatcher(DataGenerator):
 
         return self.all_boxes
     
-    def find_all_template(self,template,label=None,threshold=0.25,s=0,rotation_range=(None,None),flipping=False,method=cv2.TM_CCOEFF_NORMED):
+    def find_all_template(self,template,label=None,threshold=0.25,s=0,rotation_range=(None,None),flipping=False):
         """ Find all the the boxes for the template in image """
 
         self.w,self.h=template.shape[::-1]
         self.w=self.w+self.slack_w_right
         self.h=self.h+self.slack_h_bottom
+        self.threshold=threshold
 
         # The provided box for the label
         bbox=self.data[self.data['label']==label]["bbox"].iloc[0]
@@ -123,171 +124,102 @@ class TemplateMatcher(DataGenerator):
             search_space=self.image[bbox[0][1]-s*self.h:bbox[1][1]+s*self.h,:]
 
             # The starting coordintaes of the height.
-            h_start=bbox[0][1]-s*self.h
+            self.h_start=bbox[0][1]-s*self.h
         if s>10:
             search_space=self.image[bbox[0][1]-s:bbox[1][1]+s,:]
 
             # The starting coordintaes of the height.
-            h_start=bbox[0][1]-s
+            self.h_start=bbox[0][1]-s
 
-
-        # For Translation
-        self.res_tr=cv2.matchTemplate(search_space,template,method=method)
-        self.loc = np.where(self.res_tr >= threshold)
-        self.loc=(self.loc[0]+h_start,self.loc[1])
-
-        # Apply Non Max Suppression to delete Overlapping boxes
+        # INITIALIZING VARIABLE TO CREATE AND SELECT BOXES
         self.boxes=[]
-        for pt in zip(*self.loc[::-1]):
-            pt=(pt[0]+self.slack_w_left,pt[1]+self.slack_h_up)
-            self.boxes.append(pt)
+        self.box_dict=dict()
 
-        # Boxes only for translation
-        #self.boxes_tr=self.non_max_suppression(sorted(self.boxes),True)
-        self.boxes_tr=self.delete_overlapping_boxes(self.boxes,self.boxes)
-        self.boxes=self.boxes_tr
-        
-
-
-        
-        # Do several rotations of the template and find matches
+        # Match Translation
+        a,b=self.match(search_space,template)
+        # Match Rotation
         if if_rotation:
-            self.boxes_r=[]
             for j in rotaion_space:
-                print(f"Rotation {j}\n")
-                template=np.array(self.rotate_image(template,j))
-                self.res_r=cv2.matchTemplate(self.image,template,method=method)
-                self.loc = np.where(self.res_r >= 0.25)
-                for pt in zip(*self.loc[::-1]):
-                    pt=(pt[0]+self.slack_w_left,pt[1]+self.slack_h_up)
-                    self.boxes_r.append(pt)
-                
-                if len(self.boxes_r)>0:
-                    # Non - Max supression 
-                    self.boxes_r=self.delete_overlapping_boxes(sorted(self.boxes_r))
-                    # Delete all those boxes overlapping with boxes found in translation.
-                    self.boxes=self.boxes+self.delete_overlapping_boxes(self.boxes,self.boxes_r)
-
-
-
-        # Flip Image horizontally and vertically
-        if flipping:
-            self.boxes_f=[]
-            # Flip Image
-            template=np.array(self.flip_image(template))
-            
-            self.res_f=cv2.matchTemplate(search_space,template,method=method)
-            self.loc = np.where(self.res_f >= 0.15)
-            self.loc=(self.loc[0]+h_start,self.loc[1])
-
-            for pt in zip(*self.loc[::-1]):
-                pt=(pt[0]+self.slack_w_left,pt[1]+self.slack_h_up)
-                self.boxes_f.append(pt)
-            if len(self.boxes_f)>0:
-                # Non Max Suppression
-                self.boxes_f=self.delete_overlapping_boxes(sorted(self.boxes_f))
-                # Delete all those boxes overlapping with boxes found in translation.
-                self.boxes=self.boxes+self.delete_overlapping_boxes(self.boxes,self.boxes_f)
-
-
-            # Vertical Image
-            self.boxes_m=[]
-            template=np.array(self.mirror_image(template))
-            self.res_m=cv2.matchTemplate(search_space,template,method=method)
-            self.loc = np.where(self.res_m >= 0.15)
-
-            self.loc=(self.loc[0]+h_start,self.loc[1])
-            for pt in zip(*self.loc[::-1]):
-                pt=(pt[0]+self.slack_w_left,pt[1]+self.slack_h_up)
-                self.boxes_m.append(pt)
-
-            if len(self.boxes_m)>0:
-                # Non Max Suppression
-                self.boxes_m=self.delete_overlapping_boxes(sorted(self.boxes_m))
-                # Delete all those boxes overlapping with boxes found in translation.
-                self.boxes=self.boxes+self.delete_overlapping_boxes(self.boxes,self.boxes_m)
+                template_rotated=np.array(self.rotate_image(template,j))
+                a,b=self.match(search_space,template_rotated)
         
-        # Create Boxes
-        self.boxes=self.delete_overlapping_boxes(self.boxes)
+        # Match Flipping:
+        if flipping:
+            template_flipped=np.array(self.flip_image(template))
+            a,b=self.match(search_space,template_flipped)
+
+            template_mirrored=np.array(self.mirror_image(template))
+            a,b=self.match(search_space,template_mirrored)
+
+        # Match Scaled template of the flipped template
+        for scale in np.linspace(0.8,2,25):
+            w,h=template.shape[::-1]
+            w=int(np.floor(w*scale))
+            # Scaling the Template
+            template_scaled=np.array(self.resize_image(template,(w,h)))
+            a,b=self.match(search_space,template_scaled)
+
+            if flipping:
+                template_flipped_scaled=np.array(self.resize_image(template_flipped,(w,h)))
+                a,b=self.match(search_space,template_flipped_scaled)
+                template_mirrored_scaled=np.array(self.resize_image(template_mirrored,(w,h)))
+                a,b=self.match(search_space,template_mirrored_scaled)
+        
+        self.non_max_suppression()
         self.boxes=[self.create_boxes(i) for i in self.boxes]
         print(f"TEMPLATE MATCHING FINISHED FOR LABEL {label}")
         return self.boxes
     
+    def match(self,search_space,template,method=cv2.TM_CCOEFF_NORMED):
+        """ Template Matching for Translation, Rotation, Flipping """
+
+        res=cv2.matchTemplate(search_space,template,method=method)
+        loc = np.where(res >= self.threshold)
+        loc=(loc[0]+self.h_start,loc[1])
+
+        w,h=template.shape[::-1]
+        # Collect all the top left corners of the boxes
+        # Boxes only for translation matching
+        boxes=[]
+        for pt in zip(*loc[::-1]):
+            pt=(pt[0]+self.slack_w_left,pt[1]+self.slack_h_up)
+            boxes.append(pt)
+            self.box_dict[pt]=[res[pt[1]-self.h_start][pt[0]],(w,h)]
+
+        self.boxes+=boxes
+
+        return res,boxes
+    
     def create_boxes(self,box):
         """ Create four coordinates from the corner point """
+        w,h=self.box_dict[(box[0],box[1])][1]
+        return [[box[0],box[1]],[box[0]+w,box[1]+h]]
 
-        return [[box[0],box[1]],[box[0]+self.w,box[1]+self.h]]
-
-    def non_max_suppression(self,boxes,for_translation=False):
-
-        """ Perform Non-Max Suppression for removing overlapping boxes. For Translation boxes, it will a bit different."""
-
-        new_boxes=[boxes[0]]
-        box=self.create_boxes(new_boxes[-1])
+    def non_max_suppression(self):
         
-        for b in boxes:
+        """ Perform Non-Max Suppression for removing overlapping boxes."""
+
+        new_box=[self.boxes[0]]
+        for i,b in enumerate(self.boxes):
+            b_box=self.create_boxes(b)
             update=True
-            present_box=self.create_boxes(b)
-            for bx in new_boxes:
-                box=self.create_boxes(bx)
-                """if for_translation:
-                if bb_intersection_over_union(box,present_box)>0.01:
-                    update=False
-                    break         
-                else:"""
-                if bb_intersection_over_union(box,present_box)>0.00000001:
+            for j,nb in enumerate(new_box):
+                nb_box=self.create_boxes(nb)
+                if bb_intersection_over_union(nb_box,b_box) > 0.5 and self.box_dict[b][0]>self.box_dict[nb][0]:
+                    new_box[j]=b
                     update=False
                     break
+                if bb_intersection_over_union(nb_box,b_box) > 0.1:
+                    update=False
+                    break
+
             if update:
-                new_boxes.append(b)
-                box=self.create_boxes(b)
-        return new_boxes
-    
-    def delete_overlapping_boxes(self,A,B=None,res_A=self.boxes_tr,res_B=None):
-        """Specific Non-max Suppression. Delete boxes of B which overlaps with A. Returns transformed B """
-
-        new_B=[]
-
-        if not B:
-            B=A
-        
-        if B==A:
-            for i in range(len(B)):
-                b=B[i]
-                b_box=self.create_boxes(b)
-                update=True
-                for j in range(i+1,len(A)):
-                    a=A[j]
-                    a_box=self.create_boxes(a)
-                    if bb_intersection_over_union(a_box,b_box)>0.01:
-                        update=False
-                        break
-
-                if update:
-                    new_B.append(b)
-            return new_B
-
-        else:
-            for b in B:
-                b_box=self.create_boxes(b)
-                update=True
-                for a in A:
-                    a_box=self.create_boxes(a)
-                    if res_A and res_B:
-                        if bb_intersection_over_union(a_box,b_box)>0.01 and res_A[a[1],a[0]]>=res_B[b[1],b[0]]:
-                            update=False
-                            break
-                    else:
-                        if bb_intersection_over_union(a_box,b_box)>0.01:
-                            update=False
-                            break
-
-                if update:
-                    new_B.append(b)            
-            return new_B
-
+                new_box.append(b)
+        self.boxes=new_box
+        return new_box
     
     def plot(self,figsize=(20,20)):
+
 
         """ Plot the Image with the bounding boxes """
 
@@ -302,6 +234,18 @@ class TemplateMatcher(DataGenerator):
         plt.imshow(self.image,cmap="gray")
         plt.show()
 
+    def random_color(self):
+        """ Generate Random colors for bounding box"""
+        levels = random.choice([0,1,2])
+        color=[]
+        for i in range(3):
+            if i==levels:
+                color.append(random.choice(range(120,255,20)))
+            else:
+                color.append(random.choice(range(5,60,2)))
+        
+        return color+[128]
+        
     def createJSON(self):
         """ A class to transform JSON or CSV file to LabelMe JSON format """
         # Store all the keys.
@@ -317,11 +261,14 @@ class TemplateMatcher(DataGenerator):
         for i in range(len(shapes)):
             color=shapes[i]['line_color']
             if not color:
-                color=list(np.random.randint(0,255,3))+[128]
-                color=[int(i) for i in color]
+                color=self.random_color()
+                #color=[int(i) for i in color]
                 colors[labels[i]]=color
-            else:
-                colors[labels[i]]=color
+            else: 
+                try:
+                    colors[labels[i]]=color
+                except:
+                    pass
         
         self.labelmeData['shapes']=[]
 
@@ -341,6 +288,7 @@ class TemplateMatcher(DataGenerator):
         # Store the json file.
         with open(self.json_file, 'w+') as fp:
             json.dump(self.labelmeData, fp,indent=2)
+        print("SAVED THE JSON FILE. OPEN LabelMe and REOPEN THE SAME JSON")
 
     def save_csv(self,dir_name,dict_data):
 
@@ -576,10 +524,3 @@ if __name__=="__main__":
         
         if save=="True":
             tm.createJSON()
-
-        
-
-if __name__=="__main__":
-    """tm=TemplateMatcher("/Users/ryzenx/Documents/Internship/Dataset/image1.json",slack_w=[0,0])
-    boxes=tm.match_template("1",0.25,1)
-    tm.plot(figsize=(10,10))"""
