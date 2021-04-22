@@ -5,6 +5,8 @@ import cv2
 import random
 import sys
 import json
+import warnings
+from error_message import DuplicateWarning
 from json_to_dataset import JsonToCSV
 from datagenerator import DataGenerator
 from iou import bb_intersection_over_union
@@ -47,6 +49,9 @@ class TemplateMatcher(DataGenerator):
         # Obtaining The dataset
         self.data=json2csv.dataset
 
+        # Image Name
+        self.imagePath=self.labelmeData.get("imagePath")
+
 
         # To store the height and width of every template boxes
 
@@ -62,6 +67,9 @@ class TemplateMatcher(DataGenerator):
         print("TEMPLATE MATCHING STARTED....")
         # Creating a dictionary for storing boxes for all images
         self.all_boxes=dict() 
+
+        # A dictionary to store the cross-correlation value
+        self.all_box_dict=dict()
         if label=="-":
             label="all"
         if threshold=="-":
@@ -72,6 +80,14 @@ class TemplateMatcher(DataGenerator):
         if label=="all":
             # Get All unique labels
             self.all_labels=list(self.data['label'].unique())
+
+            # Raise a warning if there are duplicate labels
+            if len(self.all_labels)!=len(self.data['label']):
+                self.warning()
+            
+            # Check if the label is integer
+            for lb in self.all_labels:
+                self.check_int(lb)
         else:
             self.all_labels=list(label)
         
@@ -94,12 +110,12 @@ class TemplateMatcher(DataGenerator):
 
 
             # All the detected objects for the template
-            self.all_boxes[l]=self.find_all_template(template,l,threshold,search_space_boundary,rotation_range,flipping)
+            self.all_boxes[l],self.all_box_dict[l]=self.find_all_template(template,l,threshold,search_space_boundary,rotation_range,flipping)
         print("TEMPLATE MATCHING ENDED")
 
         return self.all_boxes
     
-    def find_all_template(self,template,label=None,threshold=0.25,s=0,rotation_range=(None,None),flipping=False):
+    def find_all_template(self,template,label="0",threshold=0.25,s=0,rotation_range=(None,None),flipping=False):
         """ Find all the the boxes for the template in image """
 
         self.w,self.h=template.shape[::-1]
@@ -136,20 +152,21 @@ class TemplateMatcher(DataGenerator):
         self.box_dict=dict()
 
         # Match Translation
-        a,b=self.match(search_space,template)
+        a,b=self.match(search_space,label,template)
         # Match Rotation
         if if_rotation:
             for j in rotaion_space:
                 template_rotated=np.array(self.rotate_image(template,j))
-                a,b=self.match(search_space,template_rotated)
+                a,b=self.match(search_space,label,template_rotated)
         
         # Match Flipping:
         if flipping:
+            label_flipped=label+"_flipped"
             template_flipped=np.array(self.flip_image(template))
-            a,b=self.match(search_space,template_flipped)
+            a,b=self.match(search_space,label_flipped,template_flipped)
 
             template_mirrored=np.array(self.mirror_image(template))
-            a,b=self.match(search_space,template_mirrored)
+            a,b=self.match(search_space,label_flipped,template_mirrored)
 
         # Match Scaled template of the flipped template
         for scale in np.linspace(0.8,2,25):
@@ -157,20 +174,20 @@ class TemplateMatcher(DataGenerator):
             w=int(np.floor(w*scale))
             # Scaling the Template
             template_scaled=np.array(self.resize_image(template,(w,h)))
-            a,b=self.match(search_space,template_scaled)
+            a,b=self.match(search_space,label,template_scaled)
 
             if flipping:
                 template_flipped_scaled=np.array(self.resize_image(template_flipped,(w,h)))
-                a,b=self.match(search_space,template_flipped_scaled)
+                a,b=self.match(search_space,label_flipped,template_flipped_scaled)
                 template_mirrored_scaled=np.array(self.resize_image(template_mirrored,(w,h)))
-                a,b=self.match(search_space,template_mirrored_scaled)
+                a,b=self.match(search_space,label_flipped,template_mirrored_scaled)
         
         self.non_max_suppression()
         self.boxes=[self.create_boxes(i) for i in self.boxes]
         print(f"TEMPLATE MATCHING FINISHED FOR LABEL {label}")
-        return self.boxes
+        return self.boxes,self.box_dict
     
-    def match(self,search_space,template,method=cv2.TM_CCOEFF_NORMED):
+    def match(self,search_space,label,template,method=cv2.TM_CCOEFF_NORMED):
         """ Template Matching for Translation, Rotation, Flipping """
 
         res=cv2.matchTemplate(search_space,template,method=method)
@@ -184,7 +201,7 @@ class TemplateMatcher(DataGenerator):
         for pt in zip(*loc[::-1]):
             pt=(pt[0]+self.slack_w_left,pt[1]+self.slack_h_up)
             boxes.append(pt)
-            self.box_dict[pt]=[res[pt[1]-self.h_start][pt[0]],(w,h)]
+            self.box_dict[pt]=[res[pt[1]-self.h_start][pt[0]],(w,h),label]
 
         self.boxes+=boxes
 
@@ -194,6 +211,13 @@ class TemplateMatcher(DataGenerator):
         """ Create four coordinates from the corner point """
         w,h=self.box_dict[(box[0],box[1])][1]
         return [[box[0],box[1]],[box[0]+w,box[1]+h]]
+    
+    def warning(self):
+        warnings.warn("WARNING: Duplicate Label Detected. First Box of the same label will be taken into account.", DuplicateWarning)
+    
+    def check_int(self,value):
+        if not type(value) is int:
+            raise TypeError("Only Integer Values are allowed")
 
     def non_max_suppression(self):
         
@@ -258,7 +282,7 @@ class TemplateMatcher(DataGenerator):
         shapes=self.labelmeData['shapes']
         
         colors=dict()
-        for i in range(len(shapes)):
+        for i in range(len(labels)):
             color=shapes[i]['line_color']
             if not color:
                 color=self.random_color()
@@ -277,7 +301,10 @@ class TemplateMatcher(DataGenerator):
             for bx in self.all_boxes[lb]:
                 # A temporary Dictionary
                 temp=dict()
-                temp['label']=lb
+                try:
+                    temp['label']=self.imagePath.split(" / ")[-1].split(".")[0]+"_"+self.all_box_dict[lb][tuple(bx[0])][2]
+                except:
+                    temp['label']=lb
                 temp['line_color']=colors[lb]
                 temp['fill_color']=None
                 bx=[[int(bx[0][0]),int(bx[0][1])],[int(bx[1][0]),int(bx[1][1])]]
@@ -306,7 +333,7 @@ if __name__=="__main__":
         print("3. Label: STRING or INT, The label for which the bounding boxes are to calculated. Default all.\n")
         print("4. Search Space Boundary: FLOAT. Default 0. If s is the value, range of the space [[a,b],[c,d]] is from (b-s*(d-b),d+s*(d-b)) If s>10,then it's simply added with b and d.\n")
         print("5. Plot Image: BOOLEAN, plot the image with the bounding boxes. Default True.\n")
-        print("6. Save: JSON/FALSE, To save the bounding boxes in JSON. Default False.\n")
+        print("6. Save: Boolean, To save the bounding boxes in JSON. Write - for default(False).\n")
         print("7. Rotation: LIST/False. To check if the rotated template matches anything in Image. If list then a range of angle must be given. For specific angle, just give one value and None for the other one.\n")
         print("8. Flipping: True/False. To check if the rotated template matches anything in Image.\n")
         print("9. slack_w(Optional): LIST, Parameter to adjust the width of the bounding box. Type - for default value.\n")
