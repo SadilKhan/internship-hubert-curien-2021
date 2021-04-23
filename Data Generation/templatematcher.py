@@ -2,11 +2,13 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import cv2
+import os
+import shutil
 import random
 import sys
 import json
 import warnings
-from error_message import DuplicateWarning
+from error_message import *
 from json_to_dataset import JsonToCSV
 from datagenerator import DataGenerator
 from iou import bb_intersection_over_union
@@ -58,6 +60,9 @@ class TemplateMatcher(DataGenerator):
         self.height=dict()
         self.width=dict()
 
+        # Boolean whether the matched template will be saved in JSON or not
+        self.save=False
+
 
         # Print the Arguments
         print(f"TemplateMatcher(json_file={self.json_file},slack_w={self.slack_w},slack_h={self.slack_h}")
@@ -84,12 +89,20 @@ class TemplateMatcher(DataGenerator):
             # Raise a warning if there are duplicate labels
             if len(self.all_labels)!=len(self.data['label']):
                 self.warning()
-            
-            # Check if the label is integer
-            for lb in self.all_labels:
-                self.check_int(lb)
         else:
             self.all_labels=list(label)
+        
+        # Store the descriptor from the label.
+        self.descriptor=dict()
+        for lb in self.all_labels:
+            self.create_descriptor(lb)
+        
+        self.all_labels=list(self.descriptor.keys())
+        self.data["label"]=self.data['label'].apply(lambda x: x.split(" ")[0])
+
+        """# Check if the label is integer
+        for lb in self.all_labels:
+            self.check_int(lb)"""
         
         # If range of rotation is provided or only the rotation
         if not rotation_min and not rotation_max:
@@ -168,7 +181,7 @@ class TemplateMatcher(DataGenerator):
             template_mirrored=np.array(self.mirror_image(template))
             a,b=self.match(search_space,label_flipped,template_mirrored)
 
-        # Match Scaled template of the flipped template
+        # Match Scaled template
         for scale in np.linspace(0.8,2,25):
             w,h=template.shape[::-1]
             w=int(np.floor(w*scale))
@@ -213,11 +226,25 @@ class TemplateMatcher(DataGenerator):
         return [[box[0],box[1]],[box[0]+w,box[1]+h]]
     
     def warning(self):
-        warnings.warn("WARNING: Duplicate Label Detected. First Box of the same label will be taken into account.", DuplicateWarning)
+        warnings.warn("WARNING: Duplicate Label Detected. First Box of the same label will be taken into account.", DuplicateWarning,stacklevel=2)
     
     def check_int(self,value):
         if not type(value) is int:
             raise TypeError("Only Integer Values are allowed")
+
+    def create_descriptor(self,value):
+        # Split the string containing label and metadata
+        values=value.split(" ")
+
+        # Store the metadata in the dicttionary
+        metadata=' '.join(values[1:])
+
+        # If we have duplicate label and different information then we need to save the info in a list for the same label key
+        try:
+            self.descriptor[values[0]].append(metadata)
+        except:
+            self.descriptor[values[0]]=[metadata]
+
 
     def non_max_suppression(self):
         
@@ -272,6 +299,10 @@ class TemplateMatcher(DataGenerator):
         
     def createJSON(self):
         """ A class to transform JSON or CSV file to LabelMe JSON format """
+
+        # Since the file is saved, self.save is True
+        self.save=True
+
         # Store all the keys.
         keys=self.labelmeData.keys()
 
@@ -315,13 +346,61 @@ class TemplateMatcher(DataGenerator):
         # Store the json file.
         with open(self.json_file, 'w+') as fp:
             json.dump(self.labelmeData, fp,indent=2)
-        print("SAVED THE JSON FILE. OPEN LabelMe and REOPEN THE SAME JSON")
+        self.save_template()
+        print("JSON FILE SAVED. REOPEN THE SAME JSON IN LABELME.")
+        print(f"CSV SAVED IN {self.data_path}.")
+        print(f"TEMPLATE IMAGES ARE SAVED IN {self.image_path}.")
+    
+    def cut_template(self,bbox):
+        template=self.image[bbox[0][1]:bbox[1][1],bbox[0][0]:bbox[1][0]]
+        return template
 
-    def save_csv(self,dir_name,dict_data):
+    def save_template(self):
 
-        """ Save the file in the CSV format """
+        """ Save the template in jpg format in different folders and create a csv file"""
+        if not self.save:
+            if len(self.labelmeData['shapes'])==0:
+                raise SaveError("No Bounding Box is present in the JSON file.")
 
-        pass
+            # Raise Warning for saving only default boxes
+            warnings.warn("Saving default Boxes. Run CreateJSON for storing all the templates.", DefaultBoxWarning,stacklevel=2)
+        else:
+            path="/".join(self.json_file.split("/")[:-1])
+            # Save the csv 
+            j2csv=JsonToCSV(self.json_file)
+
+            # Store the dataset
+            dataset=j2csv.dataset
+            self.data_path=path+"/"+j2csv.imagePath.split(".")[0]+"_dataset.csv"
+            dataset.to_csv(self.data_path,index=False)
+
+            # Save the template images in template folder
+            self.image_path=path+"/template"
+            image_name=j2csv.imagePath.split(".")[0]
+            
+            # Create a template folder
+            try:
+                os.mkdir(self.image_path)
+            except:
+                warnings.warn("Template folder is already present. Replacing it with new folder.",ReplaceWarning,stacklevel=2)
+                shutil.rmtree(self.image_path)
+                os.mkdir(self.image_path)
+            
+            all_labels=list(dataset['label'].unique())
+            for lb in all_labels:
+                i=0 #image counter
+                boxes=dataset[dataset['label']==lb]['bbox'].values
+                for bx in boxes:
+                    template=self.cut_template(bx)
+                    template_name=str(lb)+"_"+str(i)+".jpg"
+                    template_path=self.image_path+"/"+str(lb)+"/"+template_name
+                    # if folder isn't created then create a folder and then save
+                    try:
+                        os.mkdir(self.image_path+"/"+str(lb))  
+                    except:
+                        pass
+                    cv2.imwrite(template_path,template)
+                    i+=1
 
 
 
@@ -551,3 +630,5 @@ if __name__=="__main__":
         
         if save=="True":
             tm.createJSON()
+
+       
