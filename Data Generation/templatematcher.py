@@ -60,10 +60,6 @@ class TemplateMatcher(DataGenerator):
         self.height=dict()
         self.width=dict()
 
-        # Boolean whether the matched template will be saved in JSON or not
-        self.save=False
-
-
         # Print the Arguments
         print(f"TemplateMatcher(json_file={self.json_file},slack_w={self.slack_w},slack_h={self.slack_h}")
 
@@ -346,61 +342,8 @@ class TemplateMatcher(DataGenerator):
         # Store the json file.
         with open(self.json_file, 'w+') as fp:
             json.dump(self.labelmeData, fp,indent=2)
-        self.save_template()
         print("JSON FILE SAVED. REOPEN THE SAME JSON IN LABELME.")
-        print(f"CSV SAVED IN {self.data_path}.")
-        print(f"TEMPLATE IMAGES ARE SAVED IN {self.image_path}.")
-    
-    def cut_template(self,bbox):
-        template=self.image[bbox[0][1]:bbox[1][1],bbox[0][0]:bbox[1][0]]
-        return template
 
-    def save_template(self):
-
-        """ Save the template in jpg format in different folders and create a csv file"""
-        if not self.save:
-            if len(self.labelmeData['shapes'])==0:
-                raise SaveError("No Bounding Box is present in the JSON file.")
-
-            # Raise Warning for saving only default boxes
-            warnings.warn("Saving default Boxes. Run CreateJSON for storing all the templates.", DefaultBoxWarning,stacklevel=2)
-        else:
-            path="/".join(self.json_file.split("/")[:-1])
-            # Save the csv 
-            j2csv=JsonToCSV(self.json_file)
-
-            # Store the dataset
-            dataset=j2csv.dataset
-            self.data_path=path+"/"+j2csv.imagePath.split(".")[0]+"_dataset.csv"
-            dataset.to_csv(self.data_path,index=False)
-
-            # Save the template images in template folder
-            self.image_path=path+"/template"
-            image_name=j2csv.imagePath.split(".")[0]
-            
-            # Create a template folder
-            try:
-                os.mkdir(self.image_path)
-            except:
-                warnings.warn("Template folder is already present. Replacing it with new folder.",ReplaceWarning,stacklevel=2)
-                shutil.rmtree(self.image_path)
-                os.mkdir(self.image_path)
-            
-            all_labels=list(dataset['label'].unique())
-            for lb in all_labels:
-                i=0 #image counter
-                boxes=dataset[dataset['label']==lb]['bbox'].values
-                for bx in boxes:
-                    template=self.cut_template(bx)
-                    template_name=str(lb)+"_"+str(i)+".jpg"
-                    template_path=self.image_path+"/"+str(lb)+"/"+template_name
-                    # if folder isn't created then create a folder and then save
-                    try:
-                        os.mkdir(self.image_path+"/"+str(lb))  
-                    except:
-                        pass
-                    cv2.imwrite(template_path,template)
-                    i+=1
 
 
 
@@ -631,4 +574,4 @@ if __name__=="__main__":
         if save=="True":
             tm.createJSON()
 
-       
+     
