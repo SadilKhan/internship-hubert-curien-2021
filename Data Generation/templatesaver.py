@@ -28,7 +28,7 @@ class TemplateSaver(JsonToCSV):
 
         # Transform the image to Grayscale
         dt=DataGenerator()
-        self.image=np.asarray(dt.rgb2gray(self.image),dtype=np.uint8)
+        #self.image=np.asarray(dt.rgb2gray(self.image),dtype=np.uint8)
     
     def cut_template(self,bbox):
         """ Function to cut templates """
@@ -50,19 +50,21 @@ class TemplateSaver(JsonToCSV):
 
         path="/".join(self.json_file.split("/")[:-1])
 
-        # Store the dataset
+        # Path for the csv
         self.data_path=path+"/"+self.imagePath.split(".")[0]+"_dataset.csv"
-        self.dataset.to_csv(self.data_path,index=False)
+        # Flatten the bounding boxes
+        self.dataset_flatten=self.dataset.copy()
+        self.dataset_flatten['bbox']=self.dataset_flatten['bbox'].apply(lambda x: list(np.array(x).flatten()))
 
         # Save the template images in template folder
-        self.image_path=path+"/template"
         image_name=self.imagePath.split(".")[0]
+        self.image_path=path+"/"+image_name
         
         # Create a template folder
         try:
             os.mkdir(self.image_path)
         except:
-            warnings.warn("Template folder is already present. Replacing it with new folder.",ReplaceWarning,stacklevel=2)
+            warnings.warn("Image Folder is already present. Replacing it with new folder.",ReplaceWarning,stacklevel=2)
             shutil.rmtree(self.image_path)
             os.mkdir(self.image_path)
         
@@ -70,7 +72,7 @@ class TemplateSaver(JsonToCSV):
         for lb in all_labels:
             i=0 #image counter
             boxes=self.dataset[self.dataset['label']==lb]['bbox'].values
-            for bx in boxes:
+            for k,bx in enumerate(boxes):
                 template=self.cut_template(bx)
                 template_name=str(lb)+"_"+str(i)+".jpg"
                 template_path=self.image_path+"/"+str(lb)+"/"+template_name
@@ -81,6 +83,11 @@ class TemplateSaver(JsonToCSV):
                     pass
                 cv2.imwrite(template_path,template)
                 i+=1
+        # The original csv has same image name for all templates. Need to change in the new dataset
+        self.dataset_flatten['image_name']=self.dataset_flatten['label'].apply(lambda x:x+".jpg")
+        
+        self.dataset_flatten.to_csv(self.data_path,index=False)
+
 
 
 if __name__=="__main__":
