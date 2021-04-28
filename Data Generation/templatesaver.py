@@ -32,8 +32,10 @@ class TemplateSaver(JsonToCSV):
     
     def cut_template(self,bbox):
         """ Function to cut templates """
-
-        template=self.image[bbox[0][1]:bbox[1][1],bbox[0][0]:bbox[1][0]]
+        if len(bbox)==2:
+            template=self.image[bbox[0][1]:bbox[1][1],bbox[0][0]:bbox[1][0]]
+        else:
+            template=self.image[bbox[1]:bbox[4],bbox[2]:bbox[3]]
         return template
         
     def save_template(self):
@@ -48,17 +50,24 @@ class TemplateSaver(JsonToCSV):
             # Raise Warning for saving only default boxes
             warnings.warn("Probably Saving default Boxes. Run CreateJSON for storing all the templates.", DefaultBoxWarning,stacklevel=2)
 
-        path="/".join(self.json_file.split("/")[:-1])
-
-        # Path for the csv
-        self.data_path=path+"/"+self.imagePath.split(".")[0]+"_dataset.csv"
-        # Flatten the bounding boxes
-        self.dataset_flatten=self.dataset.copy()
-        self.dataset_flatten['bbox']=self.dataset_flatten['bbox'].apply(lambda x: list(np.array(x).flatten()))
-
+        path="/".join(self.json_file.split("/")[:-1])+"/"+"templates"
+        try:
+            x=os.listdir(path)
+        except:
+            os.mkdir(path)
+            
         # Save the template images in template folder
         image_name=self.imagePath.split(".")[0]
         self.image_path=path+"/"+image_name
+        
+
+        # Path for the csv
+        self.data_path=path+"/"+self.imagePath.split(".")[0]+"/"+image_name+"_dataset.csv"
+        # Flatten the bounding boxes
+        self.dataset_flatten=self.dataset.copy()
+        self.dataset_flatten['bbox']=self.dataset_flatten['bbox'].apply(lambda x: list(np.array(x).flatten()))
+        self.dataset_flatten["template_name"]=self.dataset_flatten['image_name']
+
         
         # Create a template folder
         try:
@@ -68,10 +77,13 @@ class TemplateSaver(JsonToCSV):
             shutil.rmtree(self.image_path)
             os.mkdir(self.image_path)
         
-        all_labels=list(self.dataset['label'].unique())
+        all_labels=list(self.dataset_flatten['label'].unique())
+        
+
         for lb in all_labels:
             i=0 #image counter
             boxes=self.dataset[self.dataset['label']==lb]['bbox'].values
+            indices=list(self.dataset_flatten[self.dataset_flatten['label']==lb].index)
             for k,bx in enumerate(boxes):
                 template=self.cut_template(bx)
                 template_name=str(lb)+"_"+str(i)+".jpg"
@@ -83,8 +95,16 @@ class TemplateSaver(JsonToCSV):
                     pass
                 cv2.imwrite(template_path,template)
                 i+=1
-        # The original csv has same image name for all templates. Need to change in the new dataset
-        self.dataset_flatten['image_name']=self.dataset_flatten['label'].apply(lambda x:x+".jpg")
+                # The original csv has same image name for all templates. Need to change in the new dataset
+                self.dataset_flatten.loc[indices[k],"template_name"]=template_name
+
+        # Create separate columns for every bounding box coordinate
+        self.dataset_flatten['xmin']=self.dataset_flatten['bbox'].apply(lambda x: x[0])
+        self.dataset_flatten['ymin']=self.dataset_flatten['bbox'].apply(lambda x: x[1])
+        self.dataset_flatten['xmax']=self.dataset_flatten['bbox'].apply(lambda x: x[2])
+        self.dataset_flatten['ymax']=self.dataset_flatten['bbox'].apply(lambda x: x[3])
+
+        del self.dataset_flatten['bbox']
         
         self.dataset_flatten.to_csv(self.data_path,index=False)
 
