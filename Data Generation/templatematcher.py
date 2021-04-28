@@ -61,7 +61,7 @@ class TemplateMatcher(DataGenerator):
         self.width=dict()
 
         # Print the Arguments
-        print(f"TemplateMatcher(json_file={self.json_file},slack_w={self.slack_w},slack_h={self.slack_h}")
+        #print(f"TemplateMatcher(json_file={self.json_file},slack_w={self.slack_w},slack_h={self.slack_h}")
 
     def match_template(self,label,threshold,search_space_boundary=0,rotation_min=None,rotation_max=None,flipping=False):
         """ Template Matcher for Any Label """
@@ -86,7 +86,10 @@ class TemplateMatcher(DataGenerator):
             if len(self.all_labels)!=len(self.data['label']):
                 self.warning()
         else:
-            self.all_labels=list(label)
+            try:
+                self.all_labels=list(int(label))
+            except:
+                self.all_labels=[label]
         # Check if the label is integer
         for lb in self.all_labels:
             self.check_int(lb)
@@ -170,6 +173,7 @@ class TemplateMatcher(DataGenerator):
         # Match Rotation
         if if_rotation:
             for j in rotaion_space:
+                label_rotated=label+"_rotated_"+str(j)
                 template_rotated=np.array(self.rotate_image(template,j))
                 a,b=self.match(search_space,label,template_rotated)
         
@@ -188,13 +192,14 @@ class TemplateMatcher(DataGenerator):
             w=int(np.floor(w*scale))
             # Scaling the Template
             template_scaled=np.array(self.resize_image(template,(w,h)))
-            a,b=self.match(search_space,label,template_scaled)
+            if h<search_space.shape[0] and w<search_space.shape[1]:
+                a,b=self.match(search_space,label,template_scaled)
 
-            if flipping:
-                template_flipped_scaled=np.array(self.resize_image(template_flipped,(w,h)))
-                a,b=self.match(search_space,label_flipped,template_flipped_scaled)
-                template_mirrored_scaled=np.array(self.resize_image(template_mirrored,(w,h)))
-                a,b=self.match(search_space,label_flipped,template_mirrored_scaled)
+                if flipping:
+                    template_flipped_scaled=np.array(self.resize_image(template_flipped,(w,h)))
+                    a,b=self.match(search_space,label_flipped,template_flipped_scaled)
+                    template_mirrored_scaled=np.array(self.resize_image(template_mirrored,(w,h)))
+                    a,b=self.match(search_space,label_flipped,template_mirrored_scaled)
         
         self.non_max_suppression()
         self.boxes=[self.create_boxes(i) for i in self.boxes]
@@ -303,17 +308,19 @@ class TemplateMatcher(DataGenerator):
         return color+[128]
     
     def check_boxes_label(self,label):
+        """ Check if all the labels are flipped or not"""
         bx=self.all_boxes[label]
         box_dict=self.all_box_dict[label]
         nbx=len(bx)
         n_flipped=0
         for i in bx:
-            if "flipped" in box_dict[(i[0][0],i[0][1])][2]:
+            if "flipped" == box_dict[(i[0][0],i[0][1])][2].split("_")[-1]:
                 n_flipped+=1
         if n_flipped==nbx:
-            new_label="_".join(label.split("_")[:-1])
+            new_label="_".join(box_dict[(i[0][0],i[0][1])][2].split("_")[:-1])
             return True,new_label
         return False,None
+    
         
     def createJSON(self):
         """ A class to transform JSON or CSV file to LabelMe JSON format """
@@ -353,13 +360,10 @@ class TemplateMatcher(DataGenerator):
             for bx in self.all_boxes[lb]:
                 # A temporary Dictionary
                 temp=dict()
-                try:
-                    temp['label']=self.imagePath.split(" / ")[-1].split(".")[0]+"_"+self.all_box_dict[lb][tuple(bx[0])][2]
-                except:
-                    if not all_flipped:
-                        temp['label']=lb
-                    else:
-                        temp["label"]=new_label
+                if not all_flipped:
+                    temp['label']=self.imagePath.split("/")[-1].split(".")[0]+"_"+self.all_box_dict[lb][tuple(bx[0])][2]
+                else:
+                    temp["label"]=self.imagePath.split("/")[-1].split(".")[0]+"_"+new_label
                 temp['line_color']=colors[lb]
                 temp['fill_color']=None
                 bx=[[int(bx[0][0]),int(bx[0][1])],[int(bx[1][0]),int(bx[1][1])]]
@@ -368,9 +372,10 @@ class TemplateMatcher(DataGenerator):
                 self.labelmeData['shapes'].append(temp)
         
         # Store the json file.
-        with open(self.json_file, 'w+') as fp:
+        self.json_file_name=self.json_file.split(".")[0]+"_matched.json"
+        with open(self.json_file_name, 'w+') as fp:
             json.dump(self.labelmeData, fp,indent=2)
-        print("JSON FILE SAVED. REOPEN THE SAME JSON IN LABELME.")
+        print("JSON FILE SAVED. REOPEN THE JSON FILE IN LABELME. ",self.json_file_name)
 
 
 
@@ -602,3 +607,4 @@ if __name__=="__main__":
         if save=="True":
             tm.createJSON()
 
+   
