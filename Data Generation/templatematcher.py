@@ -87,18 +87,23 @@ class TemplateMatcher(DataGenerator):
                 self.warning()
         else:
             self.all_labels=list(label)
+        # Check if the label is integer
+        for lb in self.all_labels:
+            self.check_int(lb)
         
         # Store the descriptor from the label.
         self.descriptor=dict()
         for lb in self.all_labels:
             self.create_descriptor(lb)
+
+        self.descriptor_name=self.json_file.split(".")[0]+"_descriptor.json"
+        with open(self.descriptor_name, 'w+') as fp:
+            json.dump(self.descriptor_name, fp,indent=2)
         
         self.all_labels=list(self.descriptor.keys())
         self.data["label"]=self.data['label'].apply(lambda x: x.split(" ")[0])
 
-        """# Check if the label is integer
-        for lb in self.all_labels:
-            self.check_int(lb)"""
+        
         
         # If range of rotation is provided or only the rotation
         if not rotation_min and not rotation_max:
@@ -178,7 +183,7 @@ class TemplateMatcher(DataGenerator):
             a,b=self.match(search_space,label_flipped,template_mirrored)
 
         # Match Scaled template
-        for scale in np.linspace(0.8,2,25):
+        for scale in np.linspace(0.5,2,25):
             w,h=template.shape[::-1]
             w=int(np.floor(w*scale))
             # Scaling the Template
@@ -194,6 +199,7 @@ class TemplateMatcher(DataGenerator):
         self.non_max_suppression()
         self.boxes=[self.create_boxes(i) for i in self.boxes]
         print(f"TEMPLATE MATCHING FINISHED FOR LABEL {label}")
+        
         return self.boxes,self.box_dict
     
     def match(self,search_space,label,template,method=cv2.TM_CCOEFF_NORMED):
@@ -221,11 +227,14 @@ class TemplateMatcher(DataGenerator):
         w,h=self.box_dict[(box[0],box[1])][1]
         return [[box[0],box[1]],[box[0]+w,box[1]+h]]
     
+    
     def warning(self):
         warnings.warn("WARNING: Duplicate Label Detected. First Box of the same label will be taken into account.", DuplicateWarning,stacklevel=2)
     
     def check_int(self,value):
-        if not type(value) is int:
+        try:
+            value=int(value)
+        except:
             raise TypeError("Only Integer Values are allowed")
 
     def create_descriptor(self,value):
@@ -292,6 +301,19 @@ class TemplateMatcher(DataGenerator):
                 color.append(random.choice(range(5,60,2)))
         
         return color+[128]
+    
+    def check_boxes_label(self,label):
+        bx=self.all_boxes[label]
+        box_dict=self.all_box_dict[label]
+        nbx=len(bx)
+        n_flipped=0
+        for i in bx:
+            if "flipped" in box_dict[(i[0][0],i[0][1])][2]:
+                n_flipped+=1
+        if n_flipped==nbx:
+            new_label="_".join(label.split("_")[:-1])
+            return True,new_label
+        return False,None
         
     def createJSON(self):
         """ A class to transform JSON or CSV file to LabelMe JSON format """
@@ -307,7 +329,8 @@ class TemplateMatcher(DataGenerator):
 
         # Get all the colors
         shapes=self.labelmeData['shapes']
-        
+
+        # Outline for boxes
         colors=dict()
         for i in range(len(labels)):
             color=shapes[i]['line_color']
@@ -325,13 +348,18 @@ class TemplateMatcher(DataGenerator):
 
         # Append all the all boxes.
         for lb in labels:
+            # if all the boxes are of flipped category, change it to normal
+            all_flipped,new_label=self.check_boxes_label(lb)
             for bx in self.all_boxes[lb]:
                 # A temporary Dictionary
                 temp=dict()
                 try:
                     temp['label']=self.imagePath.split(" / ")[-1].split(".")[0]+"_"+self.all_box_dict[lb][tuple(bx[0])][2]
                 except:
-                    temp['label']=lb
+                    if not all_flipped:
+                        temp['label']=lb
+                    else:
+                        temp["label"]=new_label
                 temp['line_color']=colors[lb]
                 temp['fill_color']=None
                 bx=[[int(bx[0][0]),int(bx[0][1])],[int(bx[1][0]),int(bx[1][1])]]
@@ -574,4 +602,3 @@ if __name__=="__main__":
         if save=="True":
             tm.createJSON()
 
-     
