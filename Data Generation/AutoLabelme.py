@@ -3,7 +3,7 @@ from tkmacosx import Button
 from tkinter import messagebox
 from tkinter import filedialog
 import os
-
+CURDIR=os.curdir
 
 
 CUR_DIR=os.curdir
@@ -13,72 +13,48 @@ class GUI():
     def __init__(self):
         # Create a gui
         self.root=Tk()
-
         self.root.title("Auto Image Annotator")
+        self.root.geometry("800x800")
 
-        # Create two Buttons
-        self.all_buttons()
+        # Menu
+        self.menu()
 
-        self.all_grids()
+        # Frame
+
+    def menu(self):
+        # Main menu bar
+        self.my_menu=Menu(self.root)
+
+        # File Menu
+        self.file_menu=Menu(self.my_menu)
+        self.my_menu.add_cascade(label="File",menu=self.file_menu)
+        self.file_menu.add_command(label="Open JSON",command=self.open_json_file)
+        self.file_menu.add_command(label="Restart",command=self.restart)
+        self.file_menu.add_command(label="Exit",command=self.root.quit)
+
+        # Edit Menu
+        self.edit_menu=Menu(self.my_menu)
+        self.my_menu.add_cascade(label="Edit",menu=self.edit_menu)
+        self.edit_menu.add_command(label="Undo",state=DISABLED)
+
+        self.root.config(menu=self.my_menu)
+    
+    def frame(self):
+        self.image_frame=Frame(self.root,width=400,height=400,bg="red")
+        self.image_frame.pack(fill="both",expand=1)
+
+    def restart(self):
+        self.image_frame.pack_forget()
+
+
+    def open_json_file(self):
+        self.root.filename=filedialog.askopenfilename(initialdir=CUR_DIR,
+        title="Select A File",filetypes=(("JSON Files","*.json"),
+        ("All Files","*.*")))
+
+        self.frame()
 
         
-    # All the commands
-
-    def open_file(self,json=False):
-        """ Open File"""
-        if json:
-            self.json_file=filedialog.askopenfilename(initialdir=CUR_DIR,
-            title="Select the Appropriate JSON File",filetypes=(("json files","*.json"),("all files","*.*")))
-
-        else:
-            self.image_file=filedialog.askopenfilename(initialdir=CUR_DIR, 
-            title="Select the Appropriate JSON File",filetypes=(("JSON files","*.json")))
-
-        if self.json_file:
-            self.next_button['state']= NORMAL
-            self.next_button.grid(row=1,column=1)
-
-
-    def working_window(self):
-        """ Open the Working Window. Main work will be done here."""
-        self.work=Toplevel()
-
-    def ask(self):
-        """ Asks to exit or not"""
-        message=messagebox.askquestion("Exiting Application","Do you want to exit the application?")
-        if message=="yes":
-            self.root.quit()
-
-    def close_window(self):
-        """ Destroys the child windows"""
-        try:
-            # Destroy all child windows
-            self.work.destroy()
-            self.top.destroy()
-        except:
-            pass
-        self.next_button['state']= DISABLED
-        self.next_button.grid(row=1,column=1)
-
-    def all_buttons(self):
-
-        """ Create all the buttons"""
-        self.json_button=Button(self.root,text="Open JSON",padx=2.5,fg="black",command=lambda: self.open_file(True))
-        #self.image_button=Button(self.root,text="Open Image",fg="black",command=self.open_file)
-        self.exit_button=Button(self.root,text="Exit",padx=10,fg="black",command=self.ask)
-        self.next_button=Button(self.root,text="Next",padx=9,fg="black",disabledbackground="lightgray",
-        disabledforeground='white',state=DISABLED,command=self.working_window)
-        self.restart_button=Button(self.root,text="Restart",padx=10,fg="black",command=self.close_window)
-
-    def all_grids(self):
-        """ Place the buttons on the GUI"""
-        self.json_button.grid(row=0,column=0)
-        self.restart_button.grid(row=1,column=0)
-        #self.image_button.grid(row=1,column=0)
-        self.exit_button.grid(row=0,column=1)
-        self.next_button.grid(row=1,column=1)
-        
-
 
 
     
