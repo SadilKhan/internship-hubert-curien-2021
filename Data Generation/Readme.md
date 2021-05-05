@@ -15,6 +15,7 @@ Autolabelme takes the json file created in LabelMe and then start template match
 5. Resize Boxes: Increases the threshold which results in resizing the boxes or reduce the number.
 6. Finer Resize Boxes: Increases the threshold by little which results in finer resizing the boxes.
 7. Save JSON: Saves a JSON file which can be read by LabelMe for further edits.
+8. Save Images: Save the cropped vignettes from the image
 
 ## Libraries Needed
 
@@ -23,3 +24,7 @@ Autolabelme takes the json file created in LabelMe and then start template match
 3. tkinter (`pip install tkinter`)
 4. colorsys (`pip install colorsys`)
 5. tkmacosx (`pip install tkmacosx`) --> (ONLY FOR MAC USERS)
+6. labelme (`pip install labelme`)[WINDOWS/LINUX] (`brew install labelme`)[MAC]
+
+## The Other Py files
+1. templatematcher.py --> Matches templates for specified labels or all the labels. Requires JSON file 
