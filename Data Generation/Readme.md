@@ -4,6 +4,8 @@ Autolabelme takes the json file created in LabelMe and then start template match
 
 ## To Run
 ` python3 /path/to/AutoLabelme.py`
+## To save the cropped images/vignettes
+`python3 /path/to/templatesaver.py <json file>`
 
 ## Function for every buttons:
 1. Next: Template matching for next label
