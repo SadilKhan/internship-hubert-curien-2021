@@ -8,6 +8,7 @@ import random
 import sys
 import json
 import warnings
+import colorsys
 from error_message import *
 from json_to_dataset import JsonToCSV
 from datagenerator import DataGenerator
@@ -43,10 +44,10 @@ class TemplateMatcher(DataGenerator):
         self.labelmeData=json2csv.json_data
 
         # Saving the original Image File
-        self.image=json2csv.image
+        self.original_image=json2csv.image
 
         # The Image file needs to be transformed to Grayscale.
-        self.image=np.asarray(self.rgb2gray(self.image),dtype=np.uint8)
+        self.image=np.asarray(self.rgb2gray(self.original_image),dtype=np.uint8)
 
         # Obtaining The dataset
         self.data=json2csv.dataset
@@ -128,9 +129,13 @@ class TemplateMatcher(DataGenerator):
 
             # All the detected objects for the template
             self.all_boxes[l],self.all_box_dict[l]=self.find_all_template(template,l,threshold,search_space_boundary,rotation_range,flipping)
+            #self.plot(self.original_image.copy())
+            
         print("TEMPLATE MATCHING ENDED")
 
-        return self.all_boxes
+    
+
+        return self.all_boxes[self.all_labels[0]],self.all_box_dict[self.all_labels[0]]
     
     def find_all_template(self,template,label="0",threshold=0.25,s=0,rotation_range=(None,None),flipping=False):
         """ Find all the the boxes for the template in image """
@@ -279,33 +284,31 @@ class TemplateMatcher(DataGenerator):
         self.boxes=new_box
         return new_box
     
-    def plot(self,figsize=(20,20)):
+    def plot(self,image=None,figsize=(20,20)):
 
 
         """ Plot the Image with the bounding boxes """
+        all_labels=list(self.all_boxes.keys())
+        if not image:
+            image=self.original_image.copy()
 
-        for k in self.all_labels:
+        for k in all_labels:
             box_k=self.all_boxes[k]
             h=self.height[k]
             w=self.width[k]
 
             for pt in box_k:
-                cv2.rectangle(self.image, (pt[0][0],pt[0][1]), (pt[1][0],pt[1][1]), (0,255,255), 2)
+                cv2.rectangle(image, (pt[0][0],pt[0][1]), (pt[1][0],pt[1][1]), (0,255,255), 2)
         plt.figure(figsize=figsize)
-        plt.imshow(self.image,cmap="gray")
+        plt.imshow(image)
         plt.show()
 
-    def random_color(self):
+    def random_color(self,label):
         """ Generate Random colors for bounding box"""
-        levels = random.choice([0,1,2])
-        color=[]
-        for i in range(3):
-            if i==levels:
-                color.append(random.choice(range(120,255,20)))
-            else:
-                color.append(random.choice(range(5,60,2)))
+
+        color=colorsys.hsv_to_rgb(np.random.rand(), 1, np.random.randint(0,200))
         
-        return color+[128]
+        return color
     
     def check_boxes_label(self,label):
         """ Check if all the labels are flipped or not"""
@@ -342,7 +345,7 @@ class TemplateMatcher(DataGenerator):
         for i in range(len(labels)):
             color=shapes[i]['line_color']
             if not color:
-                color=self.random_color()
+                color=self.random_color(int(labels[i]))
                 #color=[int(i) for i in color]
                 colors[labels[i]]=color
             else: 
@@ -606,5 +609,3 @@ if __name__=="__main__":
         
         if save=="True":
             tm.createJSON()
-
-   
