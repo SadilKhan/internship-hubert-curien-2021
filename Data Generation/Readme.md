@@ -2,6 +2,9 @@
 
 Autolabelme takes the json file created in LabelMe and then start template matching for every label
 
+## To Run
+` python3 /path/to/AutoLabelme.py`
+
 ## Function for every buttons:
 1. Next: Template matching for next label
 2. Previous: Template Matching for the previous label
@@ -13,8 +16,8 @@ Autolabelme takes the json file created in LabelMe and then start template match
 
 ## Libraries Needed
 
-1. Numpy (pip install numpy)
-2. PIL (pip install pillow)
-3. tkinter (pip install tkinter)
-4. colorsys (pip install colorsys)
-5. tkmacosx (pip install tkmacosx) --> (OPTIONAL ONLY FOR MAC USERS)
+1. Numpy (`pip install numpy`)
+2. PIL (`pip install pillow`)
+3. tkinter (`pip install tkinter`)
+4. colorsys (`pip install colorsys`)
+5. tkmacosx (`pip install tkmacosx`) --> (OPTIONAL ONLY FOR MAC USERS)
