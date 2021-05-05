@@ -66,8 +66,6 @@ class JsonToCSV:
         """for bx in bboxes:
             transormed_bboxes.append([bx[0][0],bx[0][0],bx[1][0],bx[1][0],bx[0][0]])"""
 
-
-
     def plot_image_bounding_box(self,label="all",figsize=(20,20),color='red',save=False,name=None):
         print(f"Argument: label={label},figsize={figsize},color={color},save={save},name={name}")
         if label=="all":
@@ -89,5 +87,5 @@ class JsonToCSV:
 
 if __name__=="__main__":
     j2csv=JsonToCSV('/Users/ryzenx/Documents/Internship/Dataset/image1.json')
-    j2csv.plot_image_bounding_box('Sun')
+    
 
