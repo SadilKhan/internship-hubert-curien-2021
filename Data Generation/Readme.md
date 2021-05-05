@@ -20,4 +20,4 @@ Autolabelme takes the json file created in LabelMe and then start template match
 2. PIL (`pip install pillow`)
 3. tkinter (`pip install tkinter`)
 4. colorsys (`pip install colorsys`)
-5. tkmacosx (`pip install tkmacosx`) --> (OPTIONAL ONLY FOR MAC USERS)
+5. tkmacosx (`pip install tkmacosx`) --> (ONLY FOR MAC USERS)
