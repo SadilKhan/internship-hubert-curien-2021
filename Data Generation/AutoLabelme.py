@@ -114,7 +114,7 @@ class GUI():
         self.prev_button["state"]=NORMAL
         self.start_button["state"]=DISABLED
    
-    def ok_save(self):
+    def save(self):
         pass
     
     def matching_window(self):
@@ -221,6 +221,8 @@ class GUI():
         self.refine_button=Button(self.root,text="Resize Boxes",fg="black",command=self.less_boxes)
         self.finer_resize_button=Button(self.root,text="Finer Resize Boxes",fg="black",command=self.finer_less_boxes,padx=100)
         self.more_button=Button(self.root,text="More Boxes",fg="black",command=self.more_boxes)
+        self.save_button=Button(self.root,text="Save JSON",fg="black",command=self.save,disabledforeground="black",
+        state=DISABLED,padx=100)
         
         self.start_button.place(x=1150,y=100)
         self.next_button.place(x=1270,y=100)
@@ -229,6 +231,7 @@ class GUI():
         self.refine_button.place(x=1150,y=150)
         self.more_button.place(x=1280,y=150)
         self.finer_resize_button.place(x=1050,y=200)
+        self.save_button.place(x=1050,y=300)
 
     def open_json_file(self):
         self.root.filename=filedialog.askopenfilename(initialdir=CUR_DIR,
