@@ -13,6 +13,7 @@ import shutil
 import random
 import sys
 import json
+import webbrowser
 import warnings
 import colorsys
 platformD = system()
@@ -52,7 +53,14 @@ class GUI():
         self.my_menu.add_cascade(label="Edit",menu=self.edit_menu)
         self.edit_menu.add_command(label="Undo",state=DISABLED)
 
+        # Help Menu
+        self.help_menu=Menu(self.my_menu)
+        self.my_menu.add_cascade(label="Help",menu=self.help_menu)
+        self.help_menu.add_command(label="About AutoLabelme",command=self.open_help)
+
         self.root.config(menu=self.my_menu)
+    def open_help(self):
+        webbrowser.open("https://github.com/SadilKhan/internship-hubert-curien-2021/tree/main/Data%20Generation")
     
     def frame(self,image):
         self.image_frame=Frame(self.root,width=1600,height=1000)
