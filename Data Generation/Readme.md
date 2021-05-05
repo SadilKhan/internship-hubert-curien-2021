@@ -1,6 +1,6 @@
 # AutoLabelme
 
-Autolabelme takes the json file created in LabelMe and then start template matching for every label
+Autolabelme takes the json file created in LabelMe and then start template matching for every label.
 
 ## To Run
 ` python3 /path/to/AutoLabelme.py`
