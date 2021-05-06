@@ -68,18 +68,21 @@ class GUI():
         self.label=Label(self.image_frame,image=self.my_image)
         self.image_frame.place(x=10,y=10)
         self.label.place(x=11,y=11)
+    def frame_all(self,image):
+        self.image_frame_all=Frame(self.root,width=1600,height=1000)
+        self.my_image_all=ImageTk.PhotoImage(image)
+        self.label_all=Label(self.image_frame_all,image=self.my_image_all)
+        self.image_frame_all.place(x=1050,y=400)
+        self.label_all.place(x=11,y=11)
         
         
-
     def restart(self):
         self.image_frame.place_forget()
         self.less_button.place_forget()
         self.more_button.place_forget()
-        self.start_button.place_forget()
+        self.show_button.place_forget()
         self.next_button.place_forget()
         self.prev_button.place_forget()
-        self.refine_button.place_forget()
-        self.finer_resize_button.place_forget()
  
     
     def quit(self):
@@ -99,15 +102,23 @@ class GUI():
         image=image.resize((1000,1000),Image.ANTIALIAS)
         img=ImageDraw.Draw(image)
         for bx in self.all_boxes[label]:
+            flip=False
+            bx=np.array(bx).reshape(-1)
+            if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2]:
+                flip=True
             bx=np.array(bx).reshape(-1)
             bx=bx*np.array([1000])/np.array([w,h,w,h])
             bx=tuple(bx)
-            img.rectangle(bx,outline="red")
+            if flip:
+                img.rectangle(bx,outline="blue")
+            else:
+                img.rectangle(bx,outline="red")
         self.image_frame.place_forget()
         self.frame(image)
         self.button()
         self.prev_button["state"]=NORMAL
-        self.start_button["state"]=DISABLED
+        #self.start_button["state"]=DISABLED
+        self.show_all_boxes()
         
     
     def more_boxes(self):
@@ -122,15 +133,22 @@ class GUI():
         image=image.resize((1000,1000),Image.ANTIALIAS)
         img=ImageDraw.Draw(image)
         for bx in self.all_boxes[label]:
+            flip=False
             bx=np.array(bx).reshape(-1)
+            if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2]:
+                flip=True
             bx=bx*np.array([1000])/np.array([w,h,w,h])
             bx=tuple(bx)
-            img.rectangle(bx,outline="red")
+            if flip:
+                img.rectangle(bx,outline="blue")
+            else:
+                img.rectangle(bx,outline="red")
         self.image_frame.place_forget()
         self.frame(image)
         self.button()
         self.prev_button["state"]=NORMAL
-        self.start_button["state"]=DISABLED
+        #self.start_button["state"]=DISABLED
+        self.show_all_boxes()
 
     def check_boxes_label(self,label):
         """ Check if all the labels are flipped or not"""
@@ -224,7 +242,7 @@ class GUI():
             img.rectangle(bx,outline="red")
         self.frame(image)
         self.button()
-        self.start_button['state']=DISABLED
+        #self.start_button['state']=DISABLED
 
 
     def next_matching(self):
@@ -240,18 +258,25 @@ class GUI():
         image=image.resize((1000,1000),Image.ANTIALIAS)
         img=ImageDraw.Draw(image)
         for bx in self.all_boxes[label]:
+            flip=False
             bx=np.array(bx).reshape(-1)
+            if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2]:
+                flip=True
             bx=bx*np.array([1000])/np.array([w,h,w,h])
             bx=tuple(bx)
-            img.rectangle(bx,outline="red")
+            if flip:
+                img.rectangle(bx,outline="blue")
+            else:
+                img.rectangle(bx,outline="red")
         self.image_frame.place_forget()
         self.frame(image)
         self.button()
         self.prev_button["state"]=NORMAL
-        self.start_button["state"]=DISABLED
+        #self.start_button["state"]=DISABLED
         # Disable the next button if there are no more labels
         if self.label_no+1==len(self.all_labels):
             self.next_button["state"]=DISABLED 
+        self.show_all_boxes()
 
     def prev_matching(self):
         self.label_no-=1
@@ -266,10 +291,16 @@ class GUI():
         image=image.resize((1000,1000),Image.ANTIALIAS)
         img=ImageDraw.Draw(image)
         for bx in self.all_boxes[label]:
+            flip=False
             bx=np.array(bx).reshape(-1)
+            if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2]:
+                flip=True
             bx=bx*np.array([1000])/np.array([w,h,w,h])
             bx=tuple(bx)
-            img.rectangle(bx,outline="red")
+            if flip:
+                img.rectangle(bx,outline="blue")
+            else:
+                img.rectangle(bx,outline="red")
         self.image_frame.place_forget()
         self.frame(image)
         self.button()
@@ -277,8 +308,9 @@ class GUI():
         # Disable the next button if there are no more labels
         if self.label_no!=0:
             self.prev_button["state"]=NORMAL
+        self.show_all_boxes()
 
-        self.start_button["state"]=DISABLED
+        #self.start_button["state"]=DISABLED
 
     def finer_less_boxes(self):
 
@@ -301,35 +333,60 @@ class GUI():
         self.frame(image)
         self.button()
         self.prev_button["state"]=NORMAL
-        self.start_button["state"]=DISABLED
+        #self.start_button["state"]=DISABLED
     
     def save_img(self):
         ts=TemplateSaver(self.json_file_name)
         ts.save_template()
+    
+    def show_all_boxes(self):
+        # Plot the image with the bounding boxes
+        image=Image.fromarray(self.tm.original_image.copy())
+        w,h=image.width,image.height
+        image=image.resize((500,500),Image.ANTIALIAS)
+        img=ImageDraw.Draw(image,"RGBA")
+        for lb in self.all_labels:
+            if len(self.all_boxes[lb])!=0:
+                for bx in self.all_boxes[lb]:
+                    flip=False
+                    bx=np.array(bx).reshape(-1)
+                    if "flipped" in self.all_box_dict[lb][(bx[0],bx[1])][2]:
+                        flip=True
+                    bx=bx*np.array([500])/np.array([w,h,w,h])
+                    bx=tuple(bx)
+                    if flip:
+                        img.rectangle(bx,outline="white",fill=(0,0,255,125))
+                    else:
+                        img.rectangle(bx,outline="white",fill=(255,0,0,125))
+        self.frame_all(image)
+
+
 
 
 
     def button(self):
-        self.start_button=Button(self.root,text="Start Matching",fg="black",command=self.matching_window,disabledforeground="black")
-        self.next_button=Button(self.root,text="Next >>",fg="black",command=self.next_matching,disabledforeground="black")
-        self.prev_button=Button(self.root,text="<< Previous",fg="black",command=self.prev_matching,disabledforeground="black",
+        #self.start_button=Button(self.root,text="Start Matching",fg="black",command=self.matching_window,disabledforeground="black")
+        self.next_button=Button(self.root,text="Next Line >>",fg="black",command=self.next_matching,disabledforeground="black")
+        self.prev_button=Button(self.root,text="<< Previous Line",fg="black",command=self.prev_matching,disabledforeground="black",
         state=DISABLED)
-        self.less_button=Button(self.root,text="Less Boxes",fg="black",command=self.less_boxes)
-        self.refine_button=Button(self.root,text="Resize Boxes",fg="black",command=self.less_boxes)
-        self.finer_resize_button=Button(self.root,text="Finer Resize Boxes",fg="black",command=self.finer_less_boxes,padx=100)
-        self.more_button=Button(self.root,text="More Boxes",fg="black",command=self.more_boxes)
+        self.less_button=Button(self.root,text="-",fg="black",command=self.less_boxes)
+        self.show_button=Button(self.root,text="Show all boxes",fg="black",command=self.show_all_boxes)
+        #self.refine_button=Button(self.root,text="Resize Boxes",fg="black",command=self.less_boxes)
+        #self.finer_resize_button=Button(self.root,text="Finer Resize Boxes",fg="black",command=self.finer_less_boxes,padx=100)
+        self.more_button=Button(self.root,text="+",fg="black",command=self.more_boxes)
         self.save_button=Button(self.root,text="Save JSON",fg="black",command=self.save,disabledforeground="black",padx=125)
         self.save_img_button=Button(self.root,text="Save Images",fg="black",command=self.save_img,disabledforeground="black",padx=120)
         
-        self.start_button.place(x=1150,y=100)
+        #self.start_button.place(x=1150,y=100)
         self.next_button.place(x=1270,y=100)
         self.prev_button.place(x=1050,y=100)
         self.less_button.place(x=1050,y=150)
-        self.refine_button.place(x=1150,y=150)
+        #self.refine_button.place(x=1150,y=150)
         self.more_button.place(x=1280,y=150)
-        self.finer_resize_button.place(x=1050,y=200)
+        #self.finer_resize_button.place(x=1050,y=200)
         self.save_button.place(x=1050,y=230)
         self.save_img_button.place(x=1050,y=260)
+        self.show_button.place(x=1050,y=360)
 
     def open_json_file(self):
         self.root.filename=filedialog.askopenfilename(initialdir=CUR_DIR,
@@ -361,7 +418,7 @@ class GUI():
             self.all_threshold[lb]=0.45
         
         # Present Label
-        self.label_no=0
+        self.label_no=-1
 
 
         # Plot the image and the button.
@@ -369,7 +426,7 @@ class GUI():
         image=image.resize((1000,1000),Image.ANTIALIAS)
         self.frame(image)
         self.button()
-        self.next_button['state']=DISABLED
+        #self.next_button['state']=DISABLED
 
         #self.matching_window()
         
