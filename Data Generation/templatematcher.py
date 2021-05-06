@@ -205,9 +205,10 @@ class TemplateMatcher(DataGenerator):
                     a,b=self.match(search_space,label_flipped,template_flipped_scaled)
                     template_mirrored_scaled=np.array(self.resize_image(template_mirrored,(w,h)))
                     a,b=self.match(search_space,label_flipped,template_mirrored_scaled)
-        
+        self.clean_box_dict()
         self.non_max_suppression()
         self.boxes=[self.create_boxes(i) for i in self.boxes]
+        
         print(f"TEMPLATE MATCHING FINISHED FOR LABEL {label}")
         
         return self.boxes,self.box_dict
@@ -226,11 +227,27 @@ class TemplateMatcher(DataGenerator):
         for pt in zip(*loc[::-1]):
             pt=(pt[0]+self.slack_w_left,pt[1]+self.slack_h_up)
             boxes.append(pt)
-            self.box_dict[pt]=[res[pt[1]-self.h_start][pt[0]],(w,h),label]
+            try:
+                self.box_dict[pt].append([res[pt[1]-self.h_start][pt[0]],(w,h),label])
+            except:
+                self.box_dict[pt]=[[res[pt[1]-self.h_start][pt[0]],(w,h),label]]
 
         self.boxes+=boxes
 
         return res,boxes
+    def clean_box_dict(self):
+        """ In box dict the same point can have label and the label_flipped boxes. Keep only the max value"""
+        all_points=list(self.box_dict.keys())
+        for bx in all_points:
+            if len(self.box_dict[bx])>1:
+                all_values=[]
+                for val in self.box_dict[bx]:
+                    all_values.append(val[0])
+                pos=np.argmax(all_values)
+                self.box_dict[bx]=[self.box_dict[bx][pos]]
+        for bx in all_points:
+            self.box_dict[bx]=self.box_dict[bx][0]
+
     
     def create_boxes(self,box):
         """ Create four coordinates from the corner point """
@@ -271,7 +288,7 @@ class TemplateMatcher(DataGenerator):
             update=True
             for j,nb in enumerate(new_box):
                 nb_box=self.create_boxes(nb)
-                if bb_intersection_over_union(nb_box,b_box) > 0.5 and self.box_dict[b][0]>self.box_dict[nb][0]:
+                if bb_intersection_over_union(nb_box,b_box) > 0.2 and self.box_dict[b][0]>self.box_dict[nb][0]:
                     new_box[j]=b
                     update=False
                     break
@@ -611,3 +628,7 @@ if __name__=="__main__":
             tm.createJSON()
 
         
+
+    """tm=TemplateMatcher("/Users/ryzenx/Documents/Internship/Dataset/image1.json",slack_w=[0,0])
+    boxes=tm.match_template("1",0.25,1)
+    tm.plot(figsize=(10,10))"""
