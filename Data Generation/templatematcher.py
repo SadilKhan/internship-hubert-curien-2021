@@ -265,7 +265,7 @@ class TemplateMatcher(DataGenerator):
         
         """ Perform Non-Max Suppression for removing overlapping boxes."""
 
-        new_box=[self.boxes[0]]
+        new_box=[]
         for i,b in enumerate(self.boxes):
             b_box=self.create_boxes(b)
             update=True
@@ -275,7 +275,7 @@ class TemplateMatcher(DataGenerator):
                     new_box[j]=b
                     update=False
                     break
-                if bb_intersection_over_union(nb_box,b_box) > 0.1:
+                elif bb_intersection_over_union(nb_box,b_box) > 0.1:
                     update=False
                     break
 
@@ -609,3 +609,5 @@ if __name__=="__main__":
         
         if save=="True":
             tm.createJSON()
+
+        
