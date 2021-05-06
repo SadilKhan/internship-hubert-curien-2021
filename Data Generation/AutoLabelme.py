@@ -386,7 +386,7 @@ class GUI():
         #self.finer_resize_button.place(x=1050,y=200)
         self.save_button.place(x=1050,y=230)
         self.save_img_button.place(x=1050,y=260)
-        self.show_button.place(x=1050,y=360)
+        #self.show_button.place(x=1050,y=360)
 
     def open_json_file(self):
         self.root.filename=filedialog.askopenfilename(initialdir=CUR_DIR,
@@ -426,6 +426,7 @@ class GUI():
         image=image.resize((1000,1000),Image.ANTIALIAS)
         self.frame(image)
         self.button()
+        self.show_all_boxes()
         #self.next_button['state']=DISABLED
 
         #self.matching_window()
