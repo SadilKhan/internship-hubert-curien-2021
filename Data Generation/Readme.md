@@ -6,15 +6,14 @@ Autolabelme takes the json file created in LabelMe and then start template match
 1. Open `Terminal`.
 2. `labelme` or `python3 /path/to/labelme.py`. Check [here](https://github.com/wkentaro/labelme) for more details.
 3. Create one bounding box per label.
-4. Run AutoLabelme.py ` python3 /path/to/AutoLabelme.py`
+4. Run AutoLabelme.py ` python3 /path/to/AutoLabelme.py`.
 5. Open JSON and press `Next Line >>` for starting to match.
-6. Press `Show All Boxes` for showing all the boxes that the algorithm has already
-7. Press `<< Previous Line` for viewing the matched boxes for the previous label
+6. Press `Show All Boxes` for showing all the boxes that the algorithm has already generated.
+7. Press `<< Previous Line` for viewing the matched boxes for the previous label.
 8. Press  `Save JSON` to save a json file.
 9. Open the save json file in Labelme. Labelme will show the matched templates. Edit it if necessary.
 11. Press `Save Images` in AutoLabelme if all the boxes are okay. This will save the matched templates in JPEG.
-## To save the cropped images/vignettes
-`python3 /path/to/templatesaver.py <json file>`
+
 
 ## Function of every buttons:
 1. Next: Template matching for next label
