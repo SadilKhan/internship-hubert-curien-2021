@@ -30,7 +30,7 @@ Autolabelme takes the json file created in LabelMe and then start template match
 
 1. Numpy (`pip install numpy`)
 2. PIL (`pip install pillow`)
-3. tkinter (`pip install tkinter`)
+3. tkinter (`pip install tk`)
 4. colorsys (`pip install colorsys`)
 5. tkmacosx (`pip install tkmacosx`) --> (ONLY FOR MAC USERS)
 6. labelme (`pip install labelme`)[WINDOWS/LINUX] (`brew install labelme`)[MAC]
