@@ -8,7 +8,7 @@ Autolabelme takes the json file created in LabelMe and then start template match
 3. Create one bounding box per label.
 4. Run AutoLabelme.py ` python3 /path/to/AutoLabelme.py`.
 5. Open JSON and press `Next Line >>` for starting to match.
-6. Press `Show All Boxes` for showing all the boxes that the algorithm has already generated.
+6. The Left Image will show the boxes for current Label. The smaller right image is for showing all the templates.
 7. Press `<< Previous Line` for viewing the matched boxes for the previous label.
 8. Press `+` for more boxes and `-` for less boxes or box repositioning.
 9. If you have rotated image, fill the rotation range or just enter `min` value. For example `min=45` and `max=90` will give `list(range(45,90,1))` values or just enter `min=45` which will only rotate the image once (45 degree).
