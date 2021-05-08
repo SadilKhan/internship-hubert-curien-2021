@@ -87,6 +87,15 @@ class GUI():
         self.next_button.place_forget()
         self.prev_button.place_forget()
         self.correction_button.place_forget()
+        self.add_button.place_forget()
+        self.label.place_forget()
+        self.label_for_search.place_forget()
+        self.label_min.place_forget()
+        self.label_max.place_forget()
+        self.label_search.place_forget()
+        self.entry_min.place_forget()
+        self.entry_max.place_forget()
+        self.search_space_entry.place_forget()
  
     
     def quit(self):
@@ -99,25 +108,29 @@ class GUI():
         # Increasing the threshold will result in less boxes
         threshold=self.all_threshold[label]+0.05
         self.all_threshold[label]=threshold
-        self.all_boxes[label],self.all_box_dict[label]=self.tm.match_template(label,threshold,2,self.rotation_min,self.rotation_max,True)
+        self.all_boxes[label],self.all_box_dict[label]=self.tm.match_template(label,threshold,self.search_space,self.rotation_min,self.rotation_max,True)
+        
         # Plot the image with the bounding boxes
         image=Image.fromarray(self.tm.original_image.copy())
         w,h=image.width,image.height
         image=image.resize((1000,1000),Image.ANTIALIAS)
         img=ImageDraw.Draw(image)
         for bx in self.all_boxes[label]:
-            flip=False
             bx=np.array(bx).reshape(-1)
             if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2]:
-                flip=True
-            bx=np.array(bx).reshape(-1)
-            bx=bx*np.array([1000])/np.array([w,h,w,h])
-            bx=tuple(bx)
-            if flip:
+                bx=bx*np.array([1000])/np.array([w,h,w,h])
+                bx=tuple(bx)
                 img.rectangle(bx,outline="blue")
+            elif "_rotated_" in self.all_box_dict[label][(bx[0],bx[1])][2]:
+                bx=bx*np.array([1000])/np.array([w,h,w,h])
+                bx=tuple(bx)
+                img.rectangle(bx,outline="green")
             else:
+                bx=bx*np.array([1000])/np.array([w,h,w,h])
+                bx=tuple(bx)
                 img.rectangle(bx,outline="red")
         self.image_frame.place_forget()
+        self.image_frame_all.place_forget()
         self.frame(image)
         self.button()
         self.prev_button["state"]=NORMAL
@@ -130,24 +143,28 @@ class GUI():
         # Decreasing the threshold will result in more boxes
         threshold=self.all_threshold[label]-0.05
         self.all_threshold[label]=threshold
-        self.all_boxes[label],self.all_box_dict[label]=self.tm.match_template(label,threshold,2,self.rotation_min,self.rotation_max,True)
+        self.all_boxes[label],self.all_box_dict[label]=self.tm.match_template(label,threshold,self.search_space,self.rotation_min,self.rotation_max,True)
         # Plot the image with the bounding boxes
         image=Image.fromarray(self.tm.original_image.copy())
         w,h=image.width,image.height
         image=image.resize((1000,1000),Image.ANTIALIAS)
         img=ImageDraw.Draw(image)
         for bx in self.all_boxes[label]:
-            flip=False
             bx=np.array(bx).reshape(-1)
             if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2]:
-                flip=True
-            bx=bx*np.array([1000])/np.array([w,h,w,h])
-            bx=tuple(bx)
-            if flip:
+                bx=bx*np.array([1000])/np.array([w,h,w,h])
+                bx=tuple(bx)
                 img.rectangle(bx,outline="blue")
+            elif "rotated" in self.all_box_dict[label][(bx[0],bx[1])][2]:
+                bx=bx*np.array([1000])/np.array([w,h,w,h])
+                bx=tuple(bx)
+                img.rectangle(bx,outline="green")
             else:
+                bx=bx*np.array([1000])/np.array([w,h,w,h])
+                bx=tuple(bx)
                 img.rectangle(bx,outline="red")
         self.image_frame.place_forget()
+        self.image_frame_all.place_forget()
         self.frame(image)
         self.button()
         self.prev_button["state"]=NORMAL
@@ -231,9 +248,11 @@ class GUI():
         print("JSON FILE SAVED. REOPEN THE JSON FILE IN LABELME. ",self.json_file_name)
     
     def matching_window(self):
+        if self.label_no<0:
+            self.label_no=0
         label=self.all_labels[self.label_no]
         threshold=self.all_threshold[label]
-        self.all_boxes[label],self.all_box_dict[label]=self.tm.match_template(label,threshold,2,self.rotation_min,self.rotation_max,True)
+        self.all_boxes[label],self.all_box_dict[label]=self.tm.match_template(label,threshold,self.search_space,self.rotation_min,self.rotation_max,True)
         # Plot the image with the bounding boxes
         image=Image.fromarray(self.tm.original_image.copy())
         w,h=image.width,image.height
@@ -241,9 +260,20 @@ class GUI():
         img=ImageDraw.Draw(image)
         for bx in self.all_boxes[label]:
             bx=np.array(bx).reshape(-1)
-            bx=bx*np.array([1000])/np.array([w,h,w,h])
-            bx=tuple(bx)
-            img.rectangle(bx,outline="red")
+            if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2]:
+                bx=bx*np.array([1000])/np.array([w,h,w,h])
+                bx=tuple(bx)
+                img.rectangle(bx,outline="blue")
+            elif "_rotated_" in self.all_box_dict[label][(bx[0],bx[1])][2]:
+                bx=bx*np.array([1000])/np.array([w,h,w,h])
+                bx=tuple(bx)
+                img.rectangle(bx,outline="green")
+            else:
+                bx=bx*np.array([1000])/np.array([w,h,w,h])
+                bx=tuple(bx)
+                img.rectangle(bx,outline="red")
+        self.image_frame.place_forget()
+        self.image_frame_all.place_forget()
         self.frame(image)
         self.button()
         if self.label_no+1==len(self.all_labels):
@@ -259,22 +289,26 @@ class GUI():
         if len(self.all_boxes[label])==0:   
             threshold=self.all_threshold[label]
             self.all_threshold[label]=threshold
-            self.all_boxes[label],self.all_box_dict[label]=self.tm.match_template(label,threshold,2,self.rotation_min,self.rotation_max,True)
+            self.add()
+            self.all_boxes[label],self.all_box_dict[label]=self.tm.match_template(label,threshold,self.search_space,self.rotation_min,self.rotation_max,True)
         # Plot the image with the bounding boxes
         image=Image.fromarray(self.tm.original_image.copy())
         w,h=image.width,image.height
         image=image.resize((1000,1000),Image.ANTIALIAS)
         img=ImageDraw.Draw(image)
         for bx in self.all_boxes[label]:
-            flip=False
             bx=np.array(bx).reshape(-1)
             if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2]:
-                flip=True
-            bx=bx*np.array([1000])/np.array([w,h,w,h])
-            bx=tuple(bx)
-            if flip:
+                bx=bx*np.array([1000])/np.array([w,h,w,h])
+                bx=tuple(bx)
                 img.rectangle(bx,outline="blue")
+            elif "rotated" in self.all_box_dict[label][(bx[0],bx[1])][2]:
+                bx=bx*np.array([1000])/np.array([w,h,w,h])
+                bx=tuple(bx)
+                img.rectangle(bx,outline="green")
             else:
+                bx=bx*np.array([1000])/np.array([w,h,w,h])
+                bx=tuple(bx)
                 img.rectangle(bx,outline="red")
         self.image_frame.place_forget()
         self.frame(image)
@@ -284,6 +318,8 @@ class GUI():
         # Disable the next button if there are no more labels
         if self.label_no+1==len(self.all_labels):
             self.next_button["state"]=DISABLED 
+        if self.label_no==0:
+            self.prev_button["state"]=DISABLED
         self.show_all_boxes()
 
     def prev_matching(self):
@@ -292,24 +328,29 @@ class GUI():
         if len(self.all_boxes[label])==0:   
             threshold=self.all_threshold[label]
             self.all_threshold[label]=threshold
-            self.all_boxes[label],self.all_box_dict[label]=self.tm.match_template(label,threshold,2,self.rotation_min,self.rotation_max,True)
+            self.add()
+            self.all_boxes[label],self.all_box_dict[label]=self.tm.match_template(label,threshold,self.search_space,self.rotation_min,self.rotation_max,True)
         # Plot the image with the bounding boxes
         image=Image.fromarray(self.tm.original_image.copy())
         w,h=image.width,image.height
         image=image.resize((1000,1000),Image.ANTIALIAS)
         img=ImageDraw.Draw(image)
         for bx in self.all_boxes[label]:
-            flip=False
             bx=np.array(bx).reshape(-1)
             if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2]:
-                flip=True
-            bx=bx*np.array([1000])/np.array([w,h,w,h])
-            bx=tuple(bx)
-            if flip:
+                bx=bx*np.array([1000])/np.array([w,h,w,h])
+                bx=tuple(bx)
                 img.rectangle(bx,outline="blue")
+            elif "rotated" in self.all_box_dict[label][(bx[0],bx[1])][2]:
+                bx=bx*np.array([1000])/np.array([w,h,w,h])
+                bx=tuple(bx)
+                img.rectangle(bx,outline="green")
             else:
+                bx=bx*np.array([1000])/np.array([w,h,w,h])
+                bx=tuple(bx)
                 img.rectangle(bx,outline="red")
         self.image_frame.place_forget()
+        self.image_frame_all.place_forget()
         self.frame(image)
         self.button()
         
@@ -325,6 +366,8 @@ class GUI():
     def save_img(self):
         ts=TemplateSaver(self.json_file_name)
         ts.save_template()
+        print(f"CSV SAVED IN {ts.data_path}.")
+        print(f"TEMPLATE IMAGES ARE SAVED IN {ts.image_path}.")
     
     def show_all_boxes(self):
         # Plot the image with the bounding boxes
@@ -336,15 +379,20 @@ class GUI():
             if len(self.all_boxes[lb])!=0:
                 for bx in self.all_boxes[lb]:
                     flip=False
+                    rotated=False
                     bx=np.array(bx).reshape(-1)
                     if "flipped" in self.all_box_dict[lb][(bx[0],bx[1])][2]:
                         flip=True
+                    if "rotated" in self.all_box_dict[lb][(bx[0],bx[1])][2]:
+                        rotated=True
                     bx=bx*np.array([400])/np.array([w,h,w,h])
                     bx=tuple(bx)
                     if flip:
-                        img.rectangle(bx,outline="white",fill=(0,0,255,125))
+                        img.rectangle(bx,outline="white",fill=(0,0,255,100))
+                    elif rotated:
+                        img.rectangle(bx,outline="white",fill=(0,255,0,100))
                     else:
-                        img.rectangle(bx,outline="white",fill=(255,0,0,125))
+                        img.rectangle(bx,outline="white",fill=(255,0,0,100))
         self.frame_all(image)
 
     def correction(self):
@@ -363,20 +411,24 @@ class GUI():
         image=image.resize((1000,1000),Image.ANTIALIAS)
         img=ImageDraw.Draw(image)
         for bx in self.all_boxes[label]:
-            flip=False
             bx=np.array(bx).reshape(-1)
             if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2]:
-                flip=True
-            bx=bx*np.array([1000])/np.array([w,h,w,h])
-            bx=tuple(bx)
-            if flip:
+                bx=bx*np.array([1000])/np.array([w,h,w,h])
+                bx=tuple(bx)
                 img.rectangle(bx,outline="blue")
+            elif "rotated" in self.all_box_dict[label][(bx[0],bx[1])][2]:
+                bx=bx*np.array([1000])/np.array([w,h,w,h])
+                bx=tuple(bx)
+                img.rectangle(bx,outline="green")
             else:
+                bx=bx*np.array([1000])/np.array([w,h,w,h])
+                bx=tuple(bx)
                 img.rectangle(bx,outline="red")
+        self.image_frame_all.place_forget()
         self.image_frame.place_forget()
         self.frame(image)
         self.button()
-        if self.label_no!=0:
+        if self.label_no>0:
             self.prev_button["state"]=NORMAL
         self.show_all_boxes()
     
@@ -386,36 +438,49 @@ class GUI():
 
     def right(self,event):
         if self.label_no<len(self.all_labels):
-            self.next_matching()   
+            self.next_matching()  
+    def rematch(self,event):
+        self.add() 
 
     def rotation_entry(self):
         self.label=Label(self.root,text="Rotation Range",fg="black")
+        self.label_for_search=Label(self.root,text="Search Space",fg="black")
         self.label_min=Label(self.root,text="Min",fg="black")
         self.label_max=Label(self.root,text="Max",fg="black")
+        self.label_search=Label(self.root,text="Value",fg="black")
         self.entry_min=Entry(self.root,width=20)
         self.entry_max=Entry(self.root,width=20)
-        print(self.entry_max.get())
+        self.search_space_entry=Entry(self.root,width=20)
         
-        self.label.place(x=1050,y=200)
-        self.label_min.place(x=1020,y=220)
-        self.entry_min.place(x=1050,y=220)     
-        self.entry_max.place(x=1050,y=250)
-        self.label_max.place(x=1020,y=250)
+        self.label.place(x=1050,y=180)
+        self.label_min.place(x=1020,y=200)
+        self.entry_min.place(x=1050,y=200)     
+        self.entry_max.place(x=1050,y=230)
+        self.label_max.place(x=1020,y=230)
+        self.label_for_search.place(x=1050,y=260)
+        self.label_search.place(x=1020,y=280)
+        self.search_space_entry.place(x=1060,y=280)
     
     def add(self):
         try:
             self.rotation_min=int(self.entry_min.get())
         except:
-            pass
+            self.rotation_min=None
             
         try:
             self.rotation_max=int(self.entry_max.get())
         except:
-            pass
+            self.rotation_max=None
+
+        try:
+            self.search_space=int(self.search_space_entry.get())
+        except:
+            self.search_space=2
         self.entry_min.delete(0,END)
         self.entry_max.delete(0,END)
+        self.search_space_entry.delete(0,END)
 
-        #self.matching_window()
+        self.matching_window()
 
 
 
@@ -432,7 +497,7 @@ class GUI():
         self.save_button=Button(self.root,text="Save JSON",fg="black",command=self.save,disabledforeground="black",padx=125)
         self.save_img_button=Button(self.root,text="Save Images",fg="black",command=self.save_img,disabledforeground="black",padx=120)
         self.correction_button=Button(self.root,text="Correct Label",fg="black",command=self.correction,padx=120)
-        self.add_button=Button(self.root,text="Add",fg="black",command=self.add)
+        self.add_button=Button(self.root,text="Rematch",fg="black",command=self.add)
         
         #self.start_button.place(x=1150,y=100)
         self.next_button.place(x=1270,y=50)
@@ -441,10 +506,10 @@ class GUI():
         #self.refine_button.place(x=1150,y=150)
         self.more_button.place(x=1280,y=100)
         #self.finer_resize_button.place(x=1050,y=200)
-        self.save_button.place(x=1050,y=330)
-        self.save_img_button.place(x=1050,y=360)
+        self.save_button.place(x=1050,y=350)
+        self.save_img_button.place(x=1050,y=380)
         self.correction_button.place(x=1050,y=130)
-        self.add_button.place(x=1050,y=270)
+        self.add_button.place(x=1050,y=320)
 
         # Rotation Entry
         self.rotation_entry()
@@ -478,8 +543,11 @@ class GUI():
         for lb in self.all_labels:
             self.all_threshold[lb]=0.45
         
-        # Present Label
+        # INITIALISATION
         self.label_no=-1
+        self.search_space=2
+        self.rotation_min=None
+        self.rotation_max=None
 
 
         # Plot the image and the button.
@@ -490,6 +558,7 @@ class GUI():
         self.show_all_boxes()
         self.root.bind("<Left>",self.left)
         self.root.bind("<Right>",self.right)
+        self.root.bind("<Return>",self.rematch)
 
         # For rotation Entry
         self.rotation_min=None
