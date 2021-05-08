@@ -38,11 +38,17 @@ class DataGenerator:
         """Cropping Image"""
         return image[x[0][1]:x[1][1],x[0][0]:x[1][0]]
 
-    def rotate_image(self,image,angle):
+    def rotate_image(self,image,angle,fill=True):
         """Rotation"""
         if type(image)==np.ndarray:
+            first_value=image[0]
             image=self.plot_image(np.uint8(image))
-        return image.rotate(angle)
+        else:
+            first_value=np.array(image)[0]
+        image=np.array(image.rotate(angle))
+        if fill:
+            image=Image.fromarray(np.where(image==0,first_value,image))
+        return image
 
     def resize_image(self,image,new_size):
         """Resize Image"""
