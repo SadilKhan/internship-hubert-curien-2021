@@ -12,8 +12,8 @@ Autolabelme takes the json file created in LabelMe and then start template match
 7. Press `<< Previous Line` for viewing the matched boxes for the previous label.
 8. Press `+` for more boxes and `-` for less boxes or box repositioning.
 9. If you have rotated image, fill the rotation range or just enter `min` value. For example `min=45` and `max=90` will give `list(range(45,90,1))` values or just enter `min=45` which will only rotate the image once (45 degree).
-10. The `search space value` is by default 2 which means the algorthom will check for the templates from two heights up to two heights down. Choose any value from 1 to 10. For example if your template starts from (200,200) and height and width is 100 and 100 respectively and search space=2, the algorithm will search for the template from (:,0) to (:,400) in the image. If you select more than 10 than it's just heights-the value. For example, if you choose 100 in the previous example, the it will be (:,100) to (:,300) for the image to be searched. In any case, value from 1 to 10 is sufficient.
-11. Press `Add` button. Then press `Rematch` button.
+10. The `search space value` **is by default 2** which means the algorthom will check for the templates from two heights up to two heights down. Choose any value from 1 to 10. For example if your template starts from `(200,200)` and height and width is 100 and 100 respectively and search space=2, the algorithm will search for the template from `(:,0)` to `(:,400)` in the image. If you select more than 10 than it's just heights-the value. For example, if you choose 100 in the previous example, the it will be `(:,100)` to `(:,300)` for the image to be searched. In any case, value from 1 to 10 is sufficient.
+11. Press `Rematch` button or Press `Enter` or `Return` in your keyboard.
 12. Press  `Save JSON` to save a json file.
 13. Open the save json file in Labelme. Labelme will show the matched templates. Edit it if necessary.
 14. Press `Save Images` in AutoLabelme if all the boxes are okay. This will save the matched templates in JPEG.
