@@ -49,6 +49,8 @@ class TemplateMatcher(DataGenerator):
         # The Image file needs to be transformed to Grayscale.
         self.image=np.asarray(self.rgb2gray(self.original_image),dtype=np.uint8)
 
+        self.image_height,self.image_width=self.image.shape
+
         # Obtaining The dataset
         self.data=json2csv.dataset
 
@@ -155,19 +157,19 @@ class TemplateMatcher(DataGenerator):
         if not rotation_range[-1]:
             rotaion_space= [rotation_range[0]]
         else:
-            rotaion_space=list(range(rotation_range[0],rotation_range[1],1))
+            rotaion_space=list(range(rotation_range[0],rotation_range[1]+4,5))
 
         # Restrict the search space
-        if s<=10:
-            search_space=self.image[bbox[0][1]-s*self.h:bbox[1][1]+s*self.h,:]
+        if s<=15:
+            search_space=self.image[max(bbox[0][1]-s*self.h,0):min(bbox[1][1]+s*self.h,self.image_height),:]
 
             # The starting coordintaes of the height.
-            self.h_start=bbox[0][1]-s*self.h
-        if s>10:
-            search_space=self.image[bbox[0][1]-s:bbox[1][1]+s,:]
+            self.h_start=max(bbox[0][1]-s*self.h,0)
+        if s>15:
+            search_space=self.image[max(bbox[0][1]-s,0):min(bbox[1][1]+s,self.image_height),:]
 
             # The starting coordintaes of the height.
-            self.h_start=bbox[0][1]-s
+            self.h_start=max(bbox[0][1]-s,0)
 
         # INITIALIZING VARIABLE TO CREATE AND SELECT BOXES
         self.boxes=[]
@@ -177,13 +179,15 @@ class TemplateMatcher(DataGenerator):
         a,b=self.match(search_space,label,template)
         # Match Rotation
         if if_rotation:
+            print("ROTATION WAS ENABLED")
             for j in rotaion_space:
                 label_rotated=label+"_rotated_"+str(j)
                 template_rotated=np.array(self.rotate_image(template,j))
-                a,b=self.match(search_space,label,template_rotated)
-        
+                a,b=self.match(search_space,label_rotated,template_rotated)
+
         # Match Flipping:
         if flipping:
+            print("FLIPPING WAS ENABLED")
             label_flipped=label+"_flipped"
             template_flipped=np.array(self.flip_image(template))
             a,b=self.match(search_space,label_flipped,template_flipped)
@@ -205,6 +209,12 @@ class TemplateMatcher(DataGenerator):
                     a,b=self.match(search_space,label_flipped,template_flipped_scaled)
                     template_mirrored_scaled=np.array(self.resize_image(template_mirrored,(w,h)))
                     a,b=self.match(search_space,label_flipped,template_mirrored_scaled)
+                
+                if if_rotation:
+                    for j in rotaion_space:
+                        label_rotated=label+"_rotated_"+str(j)
+                        template_rotated=np.array(self.rotate_image(template_scaled,j))
+                        a,b=self.match(search_space,label_rotated,template_rotated)
         self.clean_box_dict()
         self.non_max_suppression()
         self.boxes=[self.create_boxes(i) for i in self.boxes]
@@ -626,9 +636,3 @@ if __name__=="__main__":
         
         if save=="True":
             tm.createJSON()
-
-        
-
-    """tm=TemplateMatcher("/Users/ryzenx/Documents/Internship/Dataset/image1.json",slack_w=[0,0])
-    boxes=tm.match_template("1",0.25,1)
-    tm.plot(figsize=(10,10))"""
