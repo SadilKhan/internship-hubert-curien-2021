@@ -192,8 +192,9 @@ class TemplateMatcher(DataGenerator):
             template_flipped=np.array(self.flip_image(template))
             a,b=self.match(search_space,label_flipped,template_flipped)
 
+            label_mirrored=label+"_mirrored"
             template_mirrored=np.array(self.mirror_image(template))
-            a,b=self.match(search_space,label_flipped,template_mirrored)
+            a,b=self.match(search_space,label_mirrored,template_mirrored)
 
         # Match Scaled template
         for scale in np.linspace(0.5,2,25):
@@ -208,7 +209,7 @@ class TemplateMatcher(DataGenerator):
                     template_flipped_scaled=np.array(self.resize_image(template_flipped,(w,h)))
                     a,b=self.match(search_space,label_flipped,template_flipped_scaled)
                     template_mirrored_scaled=np.array(self.resize_image(template_mirrored,(w,h)))
-                    a,b=self.match(search_space,label_flipped,template_mirrored_scaled)
+                    a,b=self.match(search_space,label_mirrored,template_mirrored_scaled)
                 
                 if if_rotation:
                     for j in rotaion_space:
@@ -636,3 +637,4 @@ if __name__=="__main__":
         
         if save=="True":
             tm.createJSON()
+
