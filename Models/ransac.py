@@ -54,15 +54,15 @@ class ransac:
         self.sources=[self.folder+"/"+i for i in self.all_images[:-1]]
     
     def open_source(self):
-        self.sources=filedialog.askopenfilenames(title="Select Source Image",filetypes=(("jpg Files","*.jpg"),("All Files","*.*")))
+        self.sources=filedialog.askopenfilenames(title="Select Source Images",filetypes=(("jpg Files","*.jpg"),("All Files","*.*")))
 
     def open_target(self):
         self.target=filedialog.askopenfilename(title="Select Target Image",filetypes=(("jpg Files","*.jpg"),("All Files","*.*")))
     
     def alignment(self):
         self.target_image=np.asarray(Image.open(self.target),dtype=np.uint8)        
-        for It in self.sources:
-            final_image=alignment(self.target,It)
+        for Is in self.sources:
+            final_image=alignment(Is,self.target)
             name="/Users/ryzenx/other/"+It.split("/")[-1]
             cv2.imwrite(name,final_image)
         target_name="/Users/ryzenx/other/"+It.split("/")[-1].split(".")[0]+"_ref.jpg"
