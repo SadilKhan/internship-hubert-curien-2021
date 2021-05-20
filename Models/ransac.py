@@ -43,31 +43,30 @@ class ransac:
         self.start=Button(self.root,text="Start Alignment",fg="black",command=self.alignment)
 
         self.choose_folder.place(x=10,y=10)
-        self.open_source.place(x=10,y=50)
-        self.open_target.place(x=10,y=90)
+        self.open_source.place(x=10,y=90)
+        self.open_target.place(x=10,y=50)
         self.start.place(x=10,y=130)
     
     def open_folder(self):
         self.folder=filedialog.askdirectory(title="Select A Folder")
         self.all_images=os.listdir(self.folder)
-        self.source=self.folder+"/"+self.all_images[-1]
-        self.targets=[self.folder+"/"+i for i in self.all_images[:-1]]
+        self.target=self.folder+"/"+self.all_images[-1]
+        self.sources=[self.folder+"/"+i for i in self.all_images[:-1]]
     
     def open_source(self):
-        self.source=filedialog.askopenfilename(title="Select Source Image",filetypes=(("jpg Files","*.jpg"),("All Files","*.*")))
-        self.source_image=np.asarray(Image.open(self.source),dtype=np.uint8)
+        self.sources=filedialog.askopenfilenames(title="Select Source Image",filetypes=(("jpg Files","*.jpg"),("All Files","*.*")))
 
     def open_target(self):
-        self.targets=filedialog.askopenfilenames(title="Select Target Image",filetypes=(("jpg Files","*.jpg"),("All Files","*.*")))
+        self.target=filedialog.askopenfilename(title="Select Target Image",filetypes=(("jpg Files","*.jpg"),("All Files","*.*")))
     
     def alignment(self):
-        self.source_image=np.asarray(Image.open(self.source),dtype=np.uint8)        
-        for It in self.targets:
-            final_image=alignment(self.source,It)
+        self.target_image=np.asarray(Image.open(self.target),dtype=np.uint8)        
+        for It in self.sources:
+            final_image=alignment(self.target,It)
             name="/Users/ryzenx/other/"+It.split("/")[-1]
             cv2.imwrite(name,final_image)
-        source_name="/Users/ryzenx/other/"+It.split("/")[-1].split(".")[0]+"_ref.jpg"
-        cv2.imwrite(source_name,self.source_image)
+        target_name="/Users/ryzenx/other/"+It.split("/")[-1].split(".")[0]+"_ref.jpg"
+        cv2.imwrite(target_name,self.target_image)
 
 if __name__=="__main__":
     root = ransac()
