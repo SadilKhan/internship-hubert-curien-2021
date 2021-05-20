@@ -1,8 +1,8 @@
 # How to use Ransac-Flow
 
 1. [Download Ransac-Flow](https://github.com/XiSHEN0220/RANSAC-Flow)
-3. Replace the coarseAlignFeatMatch.py in ```~/ransac-flow/quick-start/coarseAlignFeatMatch.py```.
-4. Replace the outil.py in ```~/ransac-flow/utils/outlil.py```.
+3. Replace the ```coarseAlignFeatMatch.py``` in ```~/ransac-flow/quick-start/coarseAlignFeatMatch.py```.
+4. Replace the ```outil.py``` in ```~/ransac-flow/utils/outlil.py```.
 5. Download a pretrained model. [
     * ``` cd ransac-flow ```
     * ``` bash download_model.sh```
