@@ -14,3 +14,4 @@
 # Papers to Read
 * [Focal Loss](https://arxiv.org/abs/1708.02002)
 * [Mask RCNN](https://arxiv.org/pdf/1703.06870.pdf)
+* [AET vs AED](https://openaccess.thecvf.com/content_CVPR_2019/papers/Zhang_AET_vs._AED_Unsupervised_Representation_Learning_by_Auto-Encoding_Transformations_Rather_CVPR_2019_paper.pdf)
