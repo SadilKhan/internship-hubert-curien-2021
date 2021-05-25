@@ -13,3 +13,4 @@
 
 # Papers to Read
 * [Focal Loss](https://arxiv.org/abs/1708.02002)
+* [Mask RCNN](https://arxiv.org/pdf/1703.06870.pdf)
