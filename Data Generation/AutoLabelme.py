@@ -72,7 +72,7 @@ class GUI():
         self.image_frame_all=Frame(self.root,width=1600,height=1000)
         self.my_image_all=ImageTk.PhotoImage(image)
         self.label_all=Label(self.image_frame_all,image=self.my_image_all)
-        self.image_frame_all.place(x=1050,y=400)
+        self.image_frame_all.place(x=1050,y=420)
         self.label_all.place(x=11,y=11)
         
         
@@ -117,7 +117,7 @@ class GUI():
         img=ImageDraw.Draw(image)
         for bx in self.all_boxes[label]:
             bx=np.array(bx).reshape(-1)
-            if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2]:
+            if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2] or "mirrored" in self.all_box_dict[label][(bx[0],bx[1])][2]:
                 bx=bx*np.array([1000])/np.array([w,h,w,h])
                 bx=tuple(bx)
                 img.rectangle(bx,outline="blue")
@@ -151,7 +151,7 @@ class GUI():
         img=ImageDraw.Draw(image)
         for bx in self.all_boxes[label]:
             bx=np.array(bx).reshape(-1)
-            if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2]:
+            if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2] or "mirrored" in self.all_box_dict[label][(bx[0],bx[1])][2]:
                 bx=bx*np.array([1000])/np.array([w,h,w,h])
                 bx=tuple(bx)
                 img.rectangle(bx,outline="blue")
@@ -172,13 +172,13 @@ class GUI():
         self.show_all_boxes()
 
     def check_boxes_label(self,label):
-        """ Check if all the labels are flipped or not"""
+        """ Check if all the labels are flipped, mirrored or not"""
         bx=self.all_boxes[label]
         box_dict=self.all_box_dict[label]
         nbx=len(bx)
         n_flipped=0
         for i in bx:
-            if "flipped" == box_dict[(i[0][0],i[0][1])][2].split("_")[-1]:
+            if "flipped" == box_dict[(i[0][0],i[0][1])][2].split("_")[-1] or "mirrored" in self.all_box_dict[label][(bx[0],bx[1])][2]:
                 n_flipped+=1
         if n_flipped==nbx:
             new_label="_".join(box_dict[(i[0][0],i[0][1])][2].split("_")[:-1])
@@ -260,7 +260,7 @@ class GUI():
         img=ImageDraw.Draw(image)
         for bx in self.all_boxes[label]:
             bx=np.array(bx).reshape(-1)
-            if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2]:
+            if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2] or "mirrored" in self.all_box_dict[label][(bx[0],bx[1])][2]:
                 bx=bx*np.array([1000])/np.array([w,h,w,h])
                 bx=tuple(bx)
                 img.rectangle(bx,outline="blue")
@@ -278,18 +278,22 @@ class GUI():
         self.button()
         if self.label_no+1==len(self.all_labels):
             self.next_button["state"]=DISABLED
-        if self.label_no==0:
+        elif self.label_no==0:
             self.prev_button["state"]=DISABLED
         self.show_all_boxes()
-
+        
 
     def next_matching(self):
+        # Change the Search spaces and rotations to default value
+        self.search_space=2
+        self.rotation_min=None
+        self.rotation_max=None
+
         self.label_no+=1
         label=self.all_labels[self.label_no]
         if len(self.all_boxes[label])==0:   
             threshold=self.all_threshold[label]
             self.all_threshold[label]=threshold
-            self.add()
             self.all_boxes[label],self.all_box_dict[label]=self.tm.match_template(label,threshold,self.search_space,self.rotation_min,self.rotation_max,True)
         # Plot the image with the bounding boxes
         image=Image.fromarray(self.tm.original_image.copy())
@@ -298,7 +302,7 @@ class GUI():
         img=ImageDraw.Draw(image)
         for bx in self.all_boxes[label]:
             bx=np.array(bx).reshape(-1)
-            if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2]:
+            if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2] or "mirrored" in self.all_box_dict[label][(bx[0],bx[1])][2]:
                 bx=bx*np.array([1000])/np.array([w,h,w,h])
                 bx=tuple(bx)
                 img.rectangle(bx,outline="blue")
@@ -311,6 +315,7 @@ class GUI():
                 bx=tuple(bx)
                 img.rectangle(bx,outline="red")
         self.image_frame.place_forget()
+        self.image_frame_all.place_forget()
         self.frame(image)
         self.button()
         self.prev_button["state"]=NORMAL
@@ -323,6 +328,12 @@ class GUI():
         self.show_all_boxes()
 
     def prev_matching(self):
+        # Change the Search spaces and rotations to default value
+        self.search_space=2
+        self.rotation_min=None
+        self.rotation_max=None
+        self.show_all_boxes()
+
         self.label_no-=1
         label=self.all_labels[self.label_no]
         if len(self.all_boxes[label])==0:   
@@ -337,7 +348,7 @@ class GUI():
         img=ImageDraw.Draw(image)
         for bx in self.all_boxes[label]:
             bx=np.array(bx).reshape(-1)
-            if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2]:
+            if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2] or "mirrored" in self.all_box_dict[label][(bx[0],bx[1])][2]:
                 bx=bx*np.array([1000])/np.array([w,h,w,h])
                 bx=tuple(bx)
                 img.rectangle(bx,outline="blue")
@@ -381,7 +392,7 @@ class GUI():
                     flip=False
                     rotated=False
                     bx=np.array(bx).reshape(-1)
-                    if "flipped" in self.all_box_dict[lb][(bx[0],bx[1])][2]:
+                    if "flipped" in self.all_box_dict[lb][(bx[0],bx[1])][2] or "mirrored" in self.all_box_dict[lb][(bx[0],bx[1])][2]:
                         flip=True
                     if "rotated" in self.all_box_dict[lb][(bx[0],bx[1])][2]:
                         rotated=True
@@ -396,12 +407,12 @@ class GUI():
         self.frame_all(image)
 
     def correction(self):
-        """ Correct Labels for boxes. If any box has been misclassfied as flipped then this box will fix it"""
+        """ Correct Labels for boxes. If any box has been misclassfied as flipped then this will fix it"""
         label=self.all_labels[self.label_no]
         all_boxes=self.all_boxes[label]
         for bx in all_boxes:
             bx=np.array(bx).reshape(-1)
-            if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2]:
+            if "flipped" in self.all_box_dict[label][(bx[0],bx[1])][2] or "mirrored" in self.all_box_dict[label][(bx[0],bx[1])][2]:
                 x1,x2,x3=self.all_box_dict[label][(bx[0],bx[1])]
                 x3="_".join(x3.split("_")[:-1])
                 self.all_box_dict[label][(bx[0],bx[1])]=(x1,x2,x3)
@@ -561,8 +572,6 @@ class GUI():
         self.root.bind("<Return>",self.rematch)
 
         # For rotation Entry
-        self.rotation_min=None
-        self.rotation_max=None
         self.rotation_entry()
         
         
