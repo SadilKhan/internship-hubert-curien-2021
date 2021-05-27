@@ -4,6 +4,6 @@ This is a private repository to store the code files for all the work that I hav
 
 # Folder Description
 
-* Data Generation: Contains the code files for dataset generation from a single image (i.e autolabelme.py)
-* Models: Contains the code related to Models. (i.e SSD, ransac-flow)
+* Data Generation: Contains the code files for dataset generation from a single image (i.e ```autolabelme.py```)
+* Models: Contains the code related to Models. (i.e ```SSD```, ```ransac-flow```)
 * Research Papers: The Papers that I have read all throughout the internship.
