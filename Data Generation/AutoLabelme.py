@@ -177,10 +177,13 @@ class GUI():
         box_dict=self.all_box_dict[label]
         nbx=len(bx)
         n_flipped=0
+        n_mirrored=0
         for i in bx:
-            if "flipped" == box_dict[(i[0][0],i[0][1])][2].split("_")[-1] or "mirrored" in self.all_box_dict[label][(bx[0],bx[1])][2]:
+            if "flipped" == box_dict[(i[0][0],i[0][1])][2].split("_")[-1]:
                 n_flipped+=1
-        if n_flipped==nbx:
+            if "mirrored" in box_dict[(i[0][0],i[0][1])][2].split("_")[-1]:
+                n_mirrored+=1
+        if n_flipped==nbx or n_mirrored==nbx:
             new_label="_".join(box_dict[(i[0][0],i[0][1])][2].split("_")[:-1])
             return True,new_label
         return False,None
@@ -203,20 +206,9 @@ class GUI():
         # Outline for boxes
         colors=dict()
         for i in range(len(labels)):
-            """if i<=self.label_no:
-                color=shapes[i]['line_color']"""
             color=self.tm.random_color(int(labels[i]))
             #color=[int(i) for i in color]
             colors[labels[i]]=color
-            """if not color:
-                color=self.tm.random_color(int(labels[i]))
-                #color=[int(i) for i in color]
-                colors[labels[i]]=color
-            else: 
-                try:
-                    colors[labels[i]]=color
-                except:
-                    pass"""
         
         self.jsondata['shapes']=[]
 
@@ -225,6 +217,7 @@ class GUI():
             try:
                 # if all the boxes are of flipped category, change it to normal
                 all_flipped,new_label=self.check_boxes_label(lb)
+                print(len(self.all_boxes[lb]))
                 for bx in self.all_boxes[lb]:
                     # A temporary Dictionary
                     temp=dict()
@@ -239,7 +232,7 @@ class GUI():
                     temp['shape_type']="rectangle"
                     self.jsondata['shapes'].append(temp)
             except:
-                pass
+                print("Something Went Wrong during saving")
         
         # Store the json file.
         self.json_file_name=self.root.filename.split(".")[0]+"_matched.json"
@@ -524,6 +517,21 @@ class GUI():
 
         # Rotation Entry
         self.rotation_entry()
+    def create_descriptor(self,value):
+        # Split the string containing label and metadata
+        values=value.split(" ")
+
+        # Store the metadata in the dicttionary
+        metadata=' '.join(values[1:])
+
+        # If we have duplicate label and different information then we need to save the info in a list for the same label key
+        name=self.tm.imagePath.split("/")[-1].split(".")[0]+"_"+str(values[0])
+        try:
+            self.descriptor[name].append(metadata)
+        except:
+            self.descriptor[name]=[metadata]
+        
+        return values[0]
 
     def open_json_file(self):
         self.root.filename=filedialog.askopenfilename(initialdir=CUR_DIR,
@@ -536,8 +544,19 @@ class GUI():
         self.imagePath=self.tm.imagePath
         # All labels
         self.all_labels=list(self.tm.data['label'].unique())
-        self.all_labels=sorted([int(i) for i in self.all_labels])
-        self.all_labels=[str(i) for i in self.all_labels]
+        # Store the descriptor 
+        self.descriptor=dict()
+        for num,lb in enumerate(self.all_labels):
+            self.all_labels[num]=self.create_descriptor(lb)
+        
+        self.descriptor_name=self.tm.json_file.split(".")[0]+"_descriptor.json"
+        with open(self.descriptor_name, 'w+') as fp:
+            json.dump(self.descriptor, fp,indent=2)
+        
+        #self.all_labels=list(self.descriptor.keys())
+
+        """self.all_labels=sorted([int(i) for i in self.all_labels])
+        self.all_labels=[str(i) for i in self.all_labels]"""
         # All the images are saved for every labels 
         self.all_images=[]
         # All the boxes are saved for every labels
