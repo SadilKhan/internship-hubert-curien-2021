@@ -1,14 +1,6 @@
-import sys
-sys.path.append("/Users/ryzenx/Downloads/ransac-flow/quick_start")
-from coarseAlignFeatMatch import CoarseAlign
-sys.path.append('/Users/ryzenx/Downloads/ransac-flow/utils/')
-import outil
 
- 
-sys.path.append('/Users/ryzenx/Downloads/ransac-flow/model/')
-import model as model
-
-import PIL.Image as Image 
+import PIL.Image as Image
+from PIL import ImageOps
 import os 
 import numpy as np
 import torch
@@ -22,8 +14,6 @@ import pandas as pd
 import kornia.geometry as tgm
 #from scipy.misc import imresize
 from itertools import product
-if not sys.warnoptions:
-    warnings.simplefilter("ignore")
 import matplotlib.pyplot as plt 
 
 ## composite image    
@@ -34,8 +24,20 @@ def get_Avg_Image(Is, It) :
     return Image.fromarray(Imean.astype(np.uint8))
 
 
-def alignment(source,target):
-    resumePth = '/Users/ryzenx/Downloads/ransac-flow/model/pretrained/MegaDepth_Theta1_Eta001_Grad0_0.807.pth' ## model for visualization
+def alignment(source,target,folder):
+    import sys
+    sys.path.append(folder+"/quick_start")
+    sys.path.append(folder+'/model/')
+    sys.path.append(folder+'/utils/')
+    from coarseAlignFeatMatch import CoarseAlign
+    
+    import outil
+    
+    import model as model
+    if not sys.warnoptions:
+        warnings.simplefilter("ignore")
+
+    resumePth = folder+'/model/pretrained/MegaDepth_Theta1_Eta001_Grad0_0.807.pth' ## model for visualization
     kernelSize = 7
 
     Transform = outil.Homography
@@ -110,7 +112,7 @@ def alignment(source,target):
     I1_fine_pil = transforms.ToPILImage()(I1_fine.cpu().squeeze())
 
     final_image=get_Avg_Image(I1_fine_pil, coarseModel.It)
-    return np.array(final_image)
+    return final_image
 
 
 if __name__=="__main__":
