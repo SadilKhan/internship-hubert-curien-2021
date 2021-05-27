@@ -73,13 +73,14 @@ class ransac:
     
     def alignment(self):
         self.save()
-        self.target_image=np.asarray(Image.open(self.target),dtype=np.uint8)        
+        self.target_image=Image.open(self.target)     
         for Is in self.sources:
             final_image=alignment(Is,self.target,self.ransac_folder)
-            name=self.save_folder+Is.split("/")[-1]
-            cv2.imwrite(name,final_image)
-        target_name=self.save_folder+self.target.split("/")[-1].split(".")[0]+"_ref.jpg"
-        cv2.imwrite(target_name,self.target_image)
+            name=self.save_folder+"/"+Is.split("/")[-1]
+            final_image.save(name)
+        target_name=self.save_folder+"/"+self.target.split("/")[-1].split(".")[0]+"_ref.jpg"
+        #cv2.imwrite(target_name,self.target_image)
+        self.target_image.save(target_name)
 
 if __name__=="__main__":
     root = ransac()
