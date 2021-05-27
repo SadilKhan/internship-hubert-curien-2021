@@ -96,17 +96,6 @@ class TemplateMatcher(DataGenerator):
         # Check if the label is integer
         for lb in self.all_labels:
             self.check_int(lb)
-        
-        # Store the descriptor from the label.
-        self.descriptor=dict()
-        for lb in self.all_labels:
-            self.create_descriptor(lb)
-
-        self.descriptor_name=self.json_file.split(".")[0]+"_descriptor.json"
-        with open(self.descriptor_name, 'w+') as fp:
-            json.dump(self.descriptor_name, fp,indent=2)
-        
-        self.all_labels=list(self.descriptor.keys())
         self.data["label"]=self.data['label'].apply(lambda x: x.split(" ")[0])
 
         
@@ -247,14 +236,20 @@ class TemplateMatcher(DataGenerator):
 
         return res,boxes
     def clean_box_dict(self):
-        """ In box dict the same point can have label and the label_flipped boxes. Keep only the max value"""
+        """ In box dict the same point can have label,label_flipped and label_rotated boxes. Keep only the max value"""
         all_points=list(self.box_dict.keys())
+        flip_exists=[0,True]
         for bx in all_points:
             if len(self.box_dict[bx])>1:
                 all_values=[]
-                for val in self.box_dict[bx]:
+                for num,val in enumerate(self.box_dict[bx]):
+                    if "flipped" in val[2].split("_")[-1] or "mirrored" in val[2].split("_")[-1]:
+                        flip_exists=[num,True]
                     all_values.append(val[0])
                 pos=np.argmax(all_values)
+                if "rotated" in self.box_dict[bx][pos][2] and flip_exists[-1]:
+                    pos=flip_exists[0]
+                    break
                 self.box_dict[bx]=[self.box_dict[bx][pos]]
         for bx in all_points:
             self.box_dict[bx]=self.box_dict[bx][0]
@@ -275,18 +270,6 @@ class TemplateMatcher(DataGenerator):
         except:
             raise TypeError("Only Integer Values are allowed")
 
-    def create_descriptor(self,value):
-        # Split the string containing label and metadata
-        values=value.split(" ")
-
-        # Store the metadata in the dicttionary
-        metadata=' '.join(values[1:])
-
-        # If we have duplicate label and different information then we need to save the info in a list for the same label key
-        try:
-            self.descriptor[values[0]].append(metadata)
-        except:
-            self.descriptor[values[0]]=[metadata]
 
 
     def non_max_suppression(self):
@@ -337,20 +320,7 @@ class TemplateMatcher(DataGenerator):
         color=colorsys.hsv_to_rgb(np.random.rand(), 1, np.random.randint(0,200))
         
         return color
-    
-    def check_boxes_label(self,label):
-        """ Check if all the labels are flipped or not"""
-        bx=self.all_boxes[label]
-        box_dict=self.all_box_dict[label]
-        nbx=len(bx)
-        n_flipped=0
-        for i in bx:
-            if "flipped" == box_dict[(i[0][0],i[0][1])][2].split("_")[-1]:
-                n_flipped+=1
-        if n_flipped==nbx:
-            new_label="_".join(box_dict[(i[0][0],i[0][1])][2].split("_")[:-1])
-            return True,new_label
-        return False,None
+
     
         
     def createJSON(self):
@@ -638,3 +608,8 @@ if __name__=="__main__":
         if save=="True":
             tm.createJSON()
 
+        
+
+    """tm=TemplateMatcher("/Users/ryzenx/Documents/Internship/Dataset/image1.json",slack_w=[0,0])
+    boxes=tm.match_template("1",0.25,1)
+    tm.plot(figsize=(10,10))"""
