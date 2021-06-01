@@ -11,8 +11,12 @@
 * [Generalized Intersection over Union](https://arxiv.org/abs/1902.09630)
 * [Unitbox - an advanced object detection Network](https://arxiv.org/pdf/1608.01471.pdf)
 
+# Blogs Read
+* [Understanding Region of Interest — (RoI Align and RoI Warp)](https://towardsdatascience.com/understanding-region-of-interest-part-2-roi-align-and-roi-warp-f795196fc193)
+
 # Papers to Read
 * [Focal Loss](https://arxiv.org/abs/1708.02002)
 * [Mask RCNN](https://arxiv.org/pdf/1703.06870.pdf)
 * [AET vs AED](https://openaccess.thecvf.com/content_CVPR_2019/papers/Zhang_AET_vs._AED_Unsupervised_Representation_Learning_by_Auto-Encoding_Transformations_Rather_CVPR_2019_paper.pdf)
 * [Distance IOU](https://arxiv.org/pdf/1911.08287.pdf)
+
