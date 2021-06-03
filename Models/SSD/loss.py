@@ -3,8 +3,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from box_utils import match, log_sum_exp
+from box_utils import match, log_sum_exp,cxcy_to_gcxgcy,xy_to_cxcy,gcxgcy_to_cxcy
 from box_utils import match_ious, bbox_overlaps_iou, bbox_overlaps_giou, bbox_overlaps_diou, bbox_overlaps_ciou, decode,find_jaccard_overlap,cxcy_to_xy
+
 
 class FocalLoss(nn.Module):
     """
@@ -123,17 +124,30 @@ class MultiBoxLoss(nn.Module):
     (2) a confidence loss for the predicted class scores.
     """
 
-    def __init__(self, priors_cxcy, threshold=0.75, neg_pos_ratio=3, alpha=1.):
+    def __init__(self, priors_cxcy, losstype="l1",threshold=0.75, neg_pos_ratio=3, alpha=1.):
         super(MultiBoxLoss, self).__init__()
         self.priors_cxcy = priors_cxcy
         self.priors_xy = cxcy_to_xy(self.priors_cxcy)
         self.threshold = threshold
         self.neg_pos_ratio = neg_pos_ratio
         self.alpha = alpha
+
+        self.losstype=losstype
         
-        #self.giou = IouLoss("Corner",size_sum=False)
-        #self.diou=IouLoss("Corner",size_sum=False,variances=None,losstype="Diou")
-        self.l1=nn.SmoothL1Loss()
+        if self.losstype=="l1":
+            self.loss=nn.SmoothL1Loss()
+        elif self.losstype=="giou":
+            self.loss = IouLoss("Corner",size_sum=False,losstype="Giou")
+        elif self.losstype=="diou":
+            self.loss=IouLoss("Corner",size_sum=False,losstype="Diou")
+        elif self.losstype=="ciou":
+            self.loss=IouLoss("Corner",size_sum=False,losstype="Ciou")
+        elif self.losstype=="l1+diou":
+            self.loss1=nn.SmoothL1Loss()
+            self.loss2=IouLoss("Corner",size_sum=False,losstype="Diou")
+        else:
+            self.loss=nn.SmoothL1Loss()
+        
         self.cross_entropy = nn.CrossEntropyLoss(reduce=False)
         # self.cross_entropy = nn.BCELoss()
 
@@ -193,8 +207,11 @@ class MultiBoxLoss(nn.Module):
             # Store
             true_classes[i] = label_for_each_prior
 
-            # Encode center-size object coordinates into the form we regressed predicted boxes to
-            true_locs[i] = boxes[i][object_for_each_prior]  # (8732, 4)
+            if self.losstype=="l1":
+                 # Encode center-size object coordinates into the form we regressed predicted boxes to
+                true_locs[i] = cxcy_to_gcxgcy(xy_to_cxcy(boxes[i][object_for_each_prior]), self.priors_cxcy)
+            else:
+                true_locs[i] = boxes[i][object_for_each_prior]  # (8732, 4)
 
         # Identify priors that are positive (object/non-background)
         positive_priors = true_classes != 0  # (N, 8732)
@@ -202,7 +219,12 @@ class MultiBoxLoss(nn.Module):
         # LOCALIZATION LOSS
 
         # Localization loss is computed only over positive (non-background) priors
-        loc_loss = self.l1(predicted_locs[positive_priors], true_locs[positive_priors]) # (), scalar
+        if self.losstype=="l1":
+            loc_loss = self.loss(predicted_locs[positive_priors], true_locs[positive_priors]) # (), scalar
+        else:
+            # The model always predicts offsets, so we have to change the offset to center size coordinates
+            xy_predicted_locs=cxcy_to_xy(gcxgcy_to_cxcy(predicted_locs,self.priors_cxcy))
+            loc_loss=self.loss(xy_predicted_locs[positive_priors],true_locs[positive_priors])
         #print(len(predicted_locs[positive_priors]), len(true_locs[positive_priors]))
 
         # Note: indexing with a torch.uint8 (byte) tensor flattens the tensor when indexing is across multiple dimensions (N & 8732)
