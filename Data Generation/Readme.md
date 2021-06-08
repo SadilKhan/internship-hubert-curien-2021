@@ -29,6 +29,7 @@ Autolabelme takes the json file created in LabelMe and then start template match
 7. `min`: The minimum value for Rotation.
 8. `max`: The maximum value for Rotation.
 9. `Rematch`: Match again for current label.
+10. `Correct Label`: If the matched templates has mismatched labels, this button will make every label as normal with red boxes. This situation happens only for symmetric images.
 
 ## Libraries Needed
 
