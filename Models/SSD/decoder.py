@@ -3,23 +3,31 @@ import numpy as np
 import torch
 import torchvision
 import torch.nn as nn
-#from torchvision.ops import RoIAlign
+from torchvision.ops import RoIAlign
 from torchsummary import summary
 from box_utils import cxcy_to_gcxgcy,cxcy_to_xy,xy_to_cxcy,gcxgcy_to_cxcy,find_jaccard_overlap
 
 class Decoder(nn.Module):
-  def __init__(self,detector=None,output_size=(5,5)):
+  def __init__(self,detector=None,output_size=(5,5),num_filter=50000):
     super(Decoder,self).__init__()
+    """ 
+    Parameter:
+    detector --> Object Detector
+    output_size --> Output size of ROI Align step. Default (5,5)
+    filter --> Number of feature maps after merging all the feature maps
+    """
+
     # The feature maps in detector will work as encoded information.
     self.detector=detector
     self.output_size=output_size
+    self.num_filter=num_filter
         
      # ROIALIGN
     self.roialign=RoIAlign(self.output_size,1,-1)
     
 
     # Decoding Layers
-    self.convT_1=nn.ConvTranspose2d(4416,1024,kernel_size=3,stride=2) #(256,39,39)
+    self.convT_1=nn.ConvTranspose2d(self.filter,1024,kernel_size=3,stride=2) #(256,39,39)
     self.convT_2=nn.ConvTranspose2d(1024,512,kernel_size=3,stride=2) #(128,79,79)
     self.upsample_1=nn.Upsample((80,80)) #(128,80,80)
 
@@ -33,8 +41,8 @@ class Decoder(nn.Module):
   def forward(self,mask):
     x,self.boxes=mask
 
-    # Get RoI's
-    self.locs,_=cxcy_to_xy(gcxgcy_to_cxcy(self.detector(x),self.detector.priors_cxcy))
+    # Get RoI's offset
+    self.locs,_=self.detector(x)
 
 
     # Get all the feature maps
@@ -52,7 +60,7 @@ class Decoder(nn.Module):
   
   def get_feature_maps(self,x):
     """ Get all the feature maps from the ssd detector"""
-    self.rescale_factors = nn.Parameter(torch.FloatTensor(1, 512, 1, 1)).cuda()  # there are 512 channels in conv4_3_feats
+    self.rescale_factors = nn.Parameter(torch.cuda.FloatTensor(1, 512, 1, 1))  # there are 512 channels in conv4_3_feats
     
 
     # Get Conv4 and Conv7 from VGG
@@ -64,7 +72,7 @@ class Decoder(nn.Module):
     self.conv4_3 = self.conv4_3 * self.rescale_factors 
 
     # Get rest of the feature maps from
-    self.conv8_2, self.conv9_2, self.conv10_2, self.conv11_2 = self.aux_convs(self.conv7)
+    self.conv8_2, self.conv9_2, self.conv10_2, self.conv11_2 = self.detector.aux_convs(self.conv7)
 
     # Merge all the Feature maps after roi aligning
     self.merge_feature_maps()
@@ -95,6 +103,17 @@ class Decoder(nn.Module):
     #self.__roi_conv11_2=self.roi_align("conv11_2",(3,3))
 
     feature_map=torch.cat((self.__roi_conv4_3,self.__roi_conv7,self.__roi_conv8_2,self.__roi_conv9_2,self.__roi_conv10_2),dim=1)
+
+    # Since Feature maps dimensions are different for every image, we will take first 50000 filters
+    if feature_map.size(1)>=self.num_filter:
+      feature_map=feature_map[:,:self.num_filter,:,:]
+    else:
+      # We need to upsample
+      upsample=nn.Upsample(5,self.num_filter)
+      feature_map=torch.moveaxis(upsample(torch.moveaxis(upsample,1,-1)),-1,1)
+    assert feature_map.shape==torch.Size([self.__batch_size,self.num_filter,self.output_size[0],self.output_size[1]])
+
+    
     return feature_map
   
   def add_batch_number(self,boxes,batch):
@@ -105,16 +124,18 @@ class Decoder(nn.Module):
   
   def find_roi(self,feature_name,feature_size):
     """ It finds the RoI's for a specific feature name"""
-    self.__bacth_size=self.locs.size(0)
+    self.__batch_size=self.locs.size(0)
     roi_sp=[]
     min_,max_=self.__roi_pos_dict[feature_name]
+    
 
     for i in range(self.__batch_size):
       n_objects=self.boxes[i].size(0)
       overlap=find_jaccard_overlap(self.boxes[i],torch.clamp(self.detector.priors_xy[min_:max_,:],min=0))
+      locs_xy=cxcy_to_xy(gcxgcy_to_cxcy(self.locs[i],self.detector.priors_cxcy))
 
       _, prior_for_each_object = overlap.max(dim=1)
-      locs_for_map=torch.clamp(self.locs[i][min_:max_,:][prior_for_each_object],min=0,max=1)*(feature_size[0]-1)
+      locs_for_map=torch.clamp(locs_xy[min_:max_,:][prior_for_each_object],min=0,max=1)*(feature_size[0]-1)
       locs_for_map=self.add_batch_number(locs_for_map,i)
       roi_sp.append(locs_for_map)
     roi_sp=torch.cat(roi_sp,dim=0)
@@ -127,16 +148,7 @@ class Decoder(nn.Module):
     
     self.__roi=self.find_roi(feature_name,feature_size)
     aligned_map=self.roialign(self.__feat_map_dict[feature_name],self.__roi)
-    return aligned_map.reshape(self.__bacth_size-1,w,h)
-
-  
-    
-
-
-
-
-  
-  
+    return aligned_map.reshape(self.__batch_size,-1,w,h)
 
 
 
