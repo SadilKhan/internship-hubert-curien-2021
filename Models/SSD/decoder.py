@@ -8,14 +8,15 @@ from torchsummary import summary
 from box_utils import cxcy_to_gcxgcy,cxcy_to_xy,xy_to_cxcy,gcxgcy_to_cxcy,find_jaccard_overlap
 
 class Decoder(nn.Module):
-  def __init__(self,detector=None,threhsold=0.75):
+  def __init__(self,detector=None,output_size=(5,5)):
     super(Decoder,self).__init__()
     # The feature maps in detector will work as encoded information.
     self.detector=detector
+    self.output_size=output_size
         
+     # ROIALIGN
+    #self.roialign=RoIAlign(self.output_size,1,-1)
     
-    # ROIALIGN
-    self.roialign=RoIAlign((2816,3,3),1,-1)
 
     # Decoding Layers
     self.convT_1=nn.ConvTranspose2d(2816,256,kernel_size=3,stride=2) #(256,39,39)
@@ -60,34 +61,49 @@ class Decoder(nn.Module):
     self.conv4_3,self.conv7=self.detector.base(x)
 
     # Rescale conv4_3 after L2 norm
-    norm = self.conv4_3_feats.pow(2).sum(dim=1, keepdim=True).sqrt()  # (N, 1, 38, 38)
-    self.conv4_3_feats = self.conv4_3_feats / norm  # (N, 512, 38, 38)
-    self.conv4_3_feats = self.conv4_3_feats * self.rescale_factors 
+    norm = self.conv4_3.pow(2).sum(dim=1, keepdim=True).sqrt()  # (N, 1, 38, 38)
+    self.conv4_3 = self.conv4_3 / norm  # (N, 512, 38, 38)
+    self.conv4_3 = self.conv4_3 * self.rescale_factors 
 
     # Get rest of the feature maps from
-    self.conv8_2_feats, self.conv9_2_feats, self.conv10_2_feats, self.conv11_2_feats = self.aux_convs(self.conv7_feats)
+    self.conv8_2, self.conv9_2, self.conv10_2, self.conv11_2 = self.aux_convs(self.conv7_feats)
     
   
   def merge_feature_maps(self):
     """ Merge all Fearure Maps"""
-    # Feature Map ROI Postions in Locs
-    self.__roi_pos={"conv4_3":[0,5776],"conv7":[5776,7942],
+    # ROI Postions in Locs data Dictinary
+    self.__roi_pos_dict={"conv4_3":[0,5776],"conv7":[5776,7942],
                  "conv8_2":[7942,8542],"conv9_2":[8542,8692],"conv10_2":[8692,8728],
                  "conv11_2":[8728,8732]}
 
-    # Region of Interest
-    self.__roi={"conv4_3":self.locs[:,:5776,:],"conv7":self.locs[:,5776:7942,:],"conv8_2":self.locs[:,7942:8542,:],
-             "conv9_2":self.locs[:,8542:8692,:],"conv10_2":self.locs[:,8692:8728,:],"conv11_2":self.locs[:,8728:8732,:]}
+    """# Region of Interest Dictionary
+    self.__roi_dict={"conv4_3":self.locs[:,:5776,:],"conv7":self.locs[:,5776:7942,:],"conv8_2":self.locs[:,7942:8542,:],
+             "conv9_2":self.locs[:,8542:8692,:],"conv10_2":self.locs[:,8692:8728,:],"conv11_2":self.locs[:,8728:8732,:]}"""
+
+    # Feature Maps Dictionary
+    self.__feat_map_dict={"conv4_3":self.conv4_3_feats,"conv7":self.conv7,
+                 "conv8_2":self.conv8_2,"conv9_2":self.conv9_2,"conv10_2":self.conv10_2,
+                 "conv11_2":self.conv11_2}
     
     # Find Roi's for conv4_3, since we will use roialign here
-    self.__roi_conv4_3=self.find_roi("conv4_3",(38,38))
+    self.__roi_conv4_3=self.roi_align("conv4_3",(38,38))
+    self.__roi_conv7=self.roi_align("conv7",(19,19))
+    self.__roi_conv8_2=self.roi_align("conv8_2",(10,10))
+    self.__roi_conv9_2=self.roi_align("conv9_2",(5,5))
+    self.__roi_conv10_2=self.roi_align("conv10_2",(3,3))
+    self.__roi_conv11_2=self.roi_align("conv11_2",(3,3))
+  
+  def add_batch_number(self,boxes,batch):
+    """ Add Batch Number in the first column of the rois """
+    box_size=boxes.size(0)
+    return torch.stack((torch.ones((box_size,1,4),device="cuda")*batch,boxes.reshape(box_size,1,-1)),dim=2).reshape(-1,8)[:,3:]
   
   
-  def find_roi(self,feature_name,feature_size,threhsold=0.75):
+  def find_roi(self,feature_name,feature_size):
     """ It finds the RoI's for a specific feature name"""
     self.__bacth_size=self.locs.size(0)
     roi_sp=[]
-    min_,max_=self.__roi_pos[feature_name]
+    min_,max_=self.__roi_pos_dict[feature_name]
 
     for i in range(self.__batch_size):
       n_objects=self.boxes[i].size(0)
@@ -95,6 +111,23 @@ class Decoder(nn.Module):
 
       _, prior_for_each_object = overlap.max(dim=1)
       locs_for_map=torch.clamp(self.locs[i][min_:max_,:][prior_for_each_object],min=0,max=1)*(feature_size-1)
+      locs_for_map=self.add_batch_number(locs_for_map,i)
       roi_sp.append(locs_for_map)
-  
+    roi_sp=torch.cat(roi_sp,dim=0)
     return roi_sp
+
+    
+  def roi_align(self,feature_name,feature_size):
+    """ Roi Alignment """
+    w,h=self.output_size
+    
+    self.__roi=self.find_roi(feature_name,feature_size)
+    aligned_map=self.roialign(self.__feat_map_dict[feature_name],self.__roi)
+    return aligned_map.reshape(-1,w,h)
+
+  
+   
+
+
+if __name__=="__main__":
+    decoder=Decoder()
