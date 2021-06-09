@@ -1,5 +1,6 @@
 import torch
 import math
+from PIL import Image
 
 device="cpu"
 
@@ -550,7 +551,6 @@ def cxcy_to_xy(cxcy):
     return torch.cat([cxcy[:, :2] - (cxcy[:, 2:] / 2),  # x_min, y_min
                       cxcy[:, :2] + (cxcy[:, 2:] / 2)], 1)  # x_max, y_max
 
-
 def cxcy_to_gcxgcy(cxcy, priors_cxcy):
     """
     Encode bounding boxes (that are in center-size form) w.r.t. the corresponding prior boxes (that are in center-size form).
@@ -764,3 +764,26 @@ def calculate_mAP(det_boxes, det_labels, det_scores, true_boxes, true_labels, tr
     #average_precisions = {rev_label_map[c + 1]: v for c, v in enumerate(average_precisions.tolist())}
 
     return average_precisions, mean_average_precision
+
+def get_target_image(target_image_names,data,imageData,imageArray,transform=None):
+    """ Returns a list of Tensor arrays of Image """
+    target_image=[]
+    if not type(target_image_names)==list:
+        target_image_names=[target_image_names]
+
+
+    original_image_names=[img_name.split("_")[0]+".jpg" for img_name in target_image_names]
+
+    for num,im in enumerate(target_image_names):
+        coord=imageData[imageData['image_name']==im][["x_min","y_min","x_max","y_max"]].values[0]
+        img = Image.fromarray(imageArray[imageArray['image_name']==original_image_names[num]]['image_array'].values[0][
+            int(coord[1]):int(coord[3]),int(coord[0]):int(coord[2]),:])
+        img = img.convert('RGB')
+        if transform:
+          img=transform(img)
+        target_image.append(img)
+    target_image=torch.stack(target_image,dim=0)
+    return target_image
+
+
+
