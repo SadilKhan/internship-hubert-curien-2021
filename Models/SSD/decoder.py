@@ -15,18 +15,18 @@ class Decoder(nn.Module):
     self.output_size=output_size
         
      # ROIALIGN
-    #self.roialign=RoIAlign(self.output_size,1,-1)
+    self.roialign=RoIAlign(self.output_size,1,-1)
     
 
     # Decoding Layers
-    self.convT_1=nn.ConvTranspose2d(2816,256,kernel_size=3,stride=2) #(256,39,39)
-    self.convT_2=nn.ConvTranspose2d(256,128,kernel_size=3,stride=2) #(128,79,79)
+    self.convT_1=nn.ConvTranspose2d(4416,1024,kernel_size=3,stride=2) #(256,39,39)
+    self.convT_2=nn.ConvTranspose2d(1024,512,kernel_size=3,stride=2) #(128,79,79)
     self.upsample_1=nn.Upsample((80,80)) #(128,80,80)
 
-    self.convT_3=nn.ConvTranspose2d(128,64,kernel_size=3,stride=2)
+    self.convT_3=nn.ConvTranspose2d(512,128,kernel_size=3,stride=2)
     self.upsample_2=nn.Upsample((160,160))
 
-    self.convT_4=nn.ConvTranspose2d(64,32,kernel_size=3,stride=2)
+    self.convT_4=nn.ConvTranspose2d(128,32,kernel_size=3,stride=2)
     self.convT_5=nn.ConvTranspose2d(32,3,kernel_size=1,stride=2)
     self.upsample_3=nn.Upsample((640,640))
 
@@ -37,10 +37,8 @@ class Decoder(nn.Module):
     self.locs,_=cxcy_to_xy(gcxgcy_to_cxcy(self.detector(x),self.detector.priors_cxcy))
 
 
-
     # Get all the feature maps
-    self.get_feature_maps(x)
-    self.merge_feature_maps()
+    x=self.get_feature_maps(x)
 
     out=self.convT_1(x)
     out=self.convT_2(out)
@@ -66,7 +64,10 @@ class Decoder(nn.Module):
     self.conv4_3 = self.conv4_3 * self.rescale_factors 
 
     # Get rest of the feature maps from
-    self.conv8_2, self.conv9_2, self.conv10_2, self.conv11_2 = self.aux_convs(self.conv7_feats)
+    self.conv8_2, self.conv9_2, self.conv10_2, self.conv11_2 = self.aux_convs(self.conv7)
+
+    # Merge all the Feature maps after roi aligning
+    self.merge_feature_maps()
     
   
   def merge_feature_maps(self):
@@ -91,7 +92,10 @@ class Decoder(nn.Module):
     self.__roi_conv8_2=self.roi_align("conv8_2",(10,10))
     self.__roi_conv9_2=self.roi_align("conv9_2",(5,5))
     self.__roi_conv10_2=self.roi_align("conv10_2",(3,3))
-    self.__roi_conv11_2=self.roi_align("conv11_2",(3,3))
+    #self.__roi_conv11_2=self.roi_align("conv11_2",(3,3))
+
+    feature_map=torch.cat((self.__roi_conv4_3,self.__roi_conv7,self.__roi_conv8_2,self.__roi_conv9_2,self.__roi_conv10_2),dim=1)
+    return feature_map
   
   def add_batch_number(self,boxes,batch):
     """ Add Batch Number in the first column of the rois """
@@ -110,7 +114,7 @@ class Decoder(nn.Module):
       overlap=find_jaccard_overlap(self.boxes[i],torch.clamp(self.detector.priors_xy[min_:max_,:],min=0))
 
       _, prior_for_each_object = overlap.max(dim=1)
-      locs_for_map=torch.clamp(self.locs[i][min_:max_,:][prior_for_each_object],min=0,max=1)*(feature_size-1)
+      locs_for_map=torch.clamp(self.locs[i][min_:max_,:][prior_for_each_object],min=0,max=1)*(feature_size[0]-1)
       locs_for_map=self.add_batch_number(locs_for_map,i)
       roi_sp.append(locs_for_map)
     roi_sp=torch.cat(roi_sp,dim=0)
@@ -123,10 +127,17 @@ class Decoder(nn.Module):
     
     self.__roi=self.find_roi(feature_name,feature_size)
     aligned_map=self.roialign(self.__feat_map_dict[feature_name],self.__roi)
-    return aligned_map.reshape(-1,w,h)
+    return aligned_map.reshape(self.__bacth_size-1,w,h)
 
   
-   
+    
+
+
+
+
+  
+  
+
 
 
 if __name__=="__main__":
