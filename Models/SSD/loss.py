@@ -263,3 +263,23 @@ class MultiBoxLoss(nn.Module):
         # TOTAL LOSS
 
         return conf_loss + self.alpha * loc_loss
+   
+
+class DecoderLoss(nn.Module):
+    """ Loss function for Decoder """
+    def __init__(self,losstype="mse"):
+        """ Parameter:
+        losstype: bce or mse
+        """
+        super(DecoderLoss,self).__init__()
+        self.losstype=losstype
+        if self.losstype=="bce":
+            self.loss=nn.BCELoss()
+        elif self.losstype=="mse":
+            self.loss=nn.MSELoss()
+
+    
+    def forward(self,image_reconstructed,image_true):
+        loss=torch.mean(self.loss(image_reconstructed,image_true))
+        return loss
+
