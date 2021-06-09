@@ -18,4 +18,5 @@
 # Papers to Read
 * [AET vs AED](https://openaccess.thecvf.com/content_CVPR_2019/papers/Zhang_AET_vs._AED_Unsupervised_Representation_Learning_by_Auto-Encoding_Transformations_Rather_CVPR_2019_paper.pdf)
 * [Distance IOU](https://arxiv.org/pdf/1911.08287.pdf)
+* [Spacial Frequency Loss](https://arxiv.org/abs/1806.02336)
 
