@@ -14,7 +14,7 @@ Autolabelme takes the json file created in LabelMe and then start template match
 9. If you have rotated image, fill the rotation range or just enter `min` value. For example `min=45` and `max=90` will give `list(range(45,94,5))` values or just enter `min=45` which will only rotate the image once (45 degree).
 10. The `search space value` **is by default 2** which means the algorithm will check for the templates from two heights up to two heights down in the original image. Choose any value from 1 to 15. For example if your template starts from `(200,200)` and height and width is 100 and 100 respectively and search space=2, the algorithm will search for the template from `(:,0)` to `(:,400)` in the image. If you select more than 15 than it's just `heights-the value`. For example, if you choose 100 in the previous example, the it will be `(:,100)` to `(:,300)` where the templates will be searched in the image. In any case, value from 1 to 15 is sufficient.
 11. Press `Rematch` button or Press `Enter` or `Return` in your keyboard.
-12. (optional) Sometimes if the template is symmetric, the algorithm picks up some templates as flipped, to fix this, press `Correct Label`.
+12. (Optional) Sometimes if the template is symmetric, the algorithm picks up some templates as flipped, to fix this, press `Correct Label`.
 13. Press  `Save JSON` to save a json file.
 14. Open the saved json file in Labelme. Labelme will show the matched templates. Edit it if necessary.
 15. Press `Save Images` in AutoLabelme if all the boxes are okay. This will save the matched templates in JPEG.
