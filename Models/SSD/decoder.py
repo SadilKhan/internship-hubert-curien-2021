@@ -27,7 +27,7 @@ class Decoder(nn.Module):
     
 
     # Decoding Layers
-    self.convT_1=nn.ConvTranspose2d(self.filter,1024,kernel_size=3,stride=2) #(256,39,39)
+    self.convT_1=nn.ConvTranspose2d(self.num_filter,1024,kernel_size=3,stride=2) #(256,39,39)
     self.convT_2=nn.ConvTranspose2d(1024,512,kernel_size=3,stride=2) #(128,79,79)
     self.upsample_1=nn.Upsample((80,80)) #(128,80,80)
 
@@ -75,7 +75,8 @@ class Decoder(nn.Module):
     self.conv8_2, self.conv9_2, self.conv10_2, self.conv11_2 = self.detector.aux_convs(self.conv7)
 
     # Merge all the Feature maps after roi aligning
-    self.merge_feature_maps()
+    feature_map=self.merge_feature_maps()
+    return feature_map
     
   
   def merge_feature_maps(self):
@@ -90,7 +91,7 @@ class Decoder(nn.Module):
              "conv9_2":self.locs[:,8542:8692,:],"conv10_2":self.locs[:,8692:8728,:],"conv11_2":self.locs[:,8728:8732,:]}"""
 
     # Feature Maps Dictionary
-    self.__feat_map_dict={"conv4_3":self.conv4_3_feats,"conv7":self.conv7,
+    self.__feat_map_dict={"conv4_3":self.conv4_3,"conv7":self.conv7,
                  "conv8_2":self.conv8_2,"conv9_2":self.conv9_2,"conv10_2":self.conv10_2,
                  "conv11_2":self.conv11_2}
     
@@ -110,7 +111,7 @@ class Decoder(nn.Module):
     else:
       # We need to upsample
       upsample=nn.Upsample(5,self.num_filter)
-      feature_map=torch.moveaxis(upsample(torch.moveaxis(upsample,1,-1)),-1,1)
+      feature_map=torch.moveaxis(upsample(torch.moveaxis(feature_map,1,-1)),-1,1)
     assert feature_map.shape==torch.Size([self.__batch_size,self.num_filter,self.output_size[0],self.output_size[1]])
 
     
