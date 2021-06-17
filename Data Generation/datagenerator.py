@@ -74,11 +74,3 @@ class DataGenerator:
             image=self.plot_image(np.uint8(image))
         shape=image.size
         return image.transform(shape,Image.AFFINE,affine_matrix,resample=Image.BILINEAR)
-
-
-
-
-
-
-
-
