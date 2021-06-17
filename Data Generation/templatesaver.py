@@ -32,6 +32,7 @@ class TemplateSaver(JsonToCSV):
     
     def cut_template(self,bbox):
         """ Function to cut templates """
+        bbox=np.int64(np.ceil(bbox))
         if len(bbox)==2:
             template=self.image[bbox[0][1]:bbox[1][1],bbox[0][0]:bbox[1][0]]
         else:
@@ -74,6 +75,7 @@ class TemplateSaver(JsonToCSV):
             os.mkdir(self.image_path)
         except:
             warnings.warn("Image Folder is already present. Replacing it with new folder.",ReplaceWarning,stacklevel=2)
+            os.umask(0)
             shutil.rmtree(self.image_path)
             os.mkdir(self.image_path)
         
