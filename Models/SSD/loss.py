@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision import transforms
+from PIL import Image
 from torch.autograd import Variable
 from box_utils import match, log_sum_exp,cxcy_to_gcxgcy,xy_to_cxcy,gcxgcy_to_cxcy
 from box_utils import match_ious, bbox_overlaps_iou, bbox_overlaps_giou, bbox_overlaps_diou, bbox_overlaps_ciou, decode,find_jaccard_overlap,cxcy_to_xy
@@ -211,7 +213,10 @@ class MultiBoxLoss(nn.Module):
                  # Encode center-size object coordinates into the form we regressed predicted boxes to
                 true_locs[i] = cxcy_to_gcxgcy(xy_to_cxcy(boxes[i][object_for_each_prior]), self.priors_cxcy)
             else:
+                # Since all the variants of Iou Loss regress on the box coordinates, we need to transform from offset to box_coordinates
                 true_locs[i] = boxes[i][object_for_each_prior]  # (8732, 4)
+                # Convert the predicted locs from offset to Corner Size coordinates
+                predicted_locs[i]=cxcy_to_xy(gcxgcy_to_cxcy(predicted_locs[i],self.priors_cxcy))
 
         # Identify priors that are positive (object/non-background)
         positive_priors = true_classes != 0  # (N, 8732)
@@ -223,9 +228,7 @@ class MultiBoxLoss(nn.Module):
             loc_loss = self.loss(predicted_locs[positive_priors], true_locs[positive_priors]) # (), scalar
         else:
             # The model always predicts offsets, so we have to change the offset to center size coordinates
-            xy_predicted_locs=cxcy_to_xy(gcxgcy_to_cxcy(predicted_locs,self.priors_cxcy))
-            loc_loss=self.loss(xy_predicted_locs[positive_priors],true_locs[positive_priors])
-        #print(len(predicted_locs[positive_priors]), len(true_locs[positive_priors]))
+            loc_loss=self.loss(predicted_locs[positive_priors],true_locs[positive_priors])
 
         # Note: indexing with a torch.uint8 (byte) tensor flattens the tensor when indexing is across multiple dimensions (N & 8732)
         # So, if predicted_locs has the shape (N, 8732, 4), predicted_locs[positive_priors] will have (total positives, 4)
@@ -263,23 +266,47 @@ class MultiBoxLoss(nn.Module):
         # TOTAL LOSS
 
         return conf_loss + self.alpha * loc_loss
-   
 
 class DecoderLoss(nn.Module):
-    """ Loss function for Decoder """
+    """ Loss function for Decoder"""
     def __init__(self,losstype="mse"):
-        """ Parameter:
-        losstype: bce or mse
-        """
         super(DecoderLoss,self).__init__()
-        self.losstype=losstype
-        if self.losstype=="bce":
-            self.loss=nn.BCELoss()
-        elif self.losstype=="mse":
+        self.losstype="mse"
+        if self.losstype=="mse":
             self.loss=nn.MSELoss()
-
     
-    def forward(self,image_reconstructed,image_true):
-        loss=torch.mean(self.loss(image_reconstructed,image_true))
+    def forward(self,image_reconstructed,target_image,pred_loc,actual_loc):    
+        # Now we need to match the template of the reconstructed image with target image.
+        total_loss=[]
+        batch_size=len(pred_loc)
+
+        for batch in range(batch_size):
+            loss_per_batch=0
+            get_overlap=find_jaccard_overlap(torch.stack(list(pred_loc[batch].values())),actual_loc[batch])
+            indices=get_overlap.max(dim=1)[1]
+            for k in range(len(indices)):
+                image=self.get_image(target_image[batch],actual_loc[batch][indices[k]])
+                image=self.resize_image(target_image[batch])
+                ls=self.loss(image_reconstructed[batch][k].to("cuda"),image.to("cuda"))
+                loss_per_batch+=ls
+            total_loss.append(loss_per_batch)
+        
+        loss=torch.mean(torch.stack(total_loss))
         return loss
 
+        
+    def get_image(self,image,box):
+        box=torch.round(box*image.size(-1))
+        box=[int(b) for b in box.tolist()]
+        return image[box[1]:box[3],box[0]:box[2]]
+    
+    def resize_image(self,image,size=(100,100)):
+        transforms_pil=transforms.ToPILImage()
+        transforms_tensor=transforms.ToTensor()
+
+        image=transforms_tensor(transforms_pil(image).resize(size,Image.NEAREST))
+        return image
+        
+    def forward(self,image_reconstructed,image_true):
+        loss=torch.mean(self.loss(image_reconstructed,image_true))
+        return loss     
