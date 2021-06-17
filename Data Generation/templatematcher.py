@@ -53,6 +53,7 @@ class TemplateMatcher(DataGenerator):
 
         # Obtaining The dataset
         self.data=json2csv.dataset
+        
 
         # Image Name
         self.imagePath=self.labelmeData.get("imagePath")
@@ -110,7 +111,8 @@ class TemplateMatcher(DataGenerator):
 
 
         for l in self.all_labels:
-            bbox=self.data[self.data['label']==l]['bbox'].iloc[0]
+            bbox=np.array(self.data[self.data['label']==l]['bbox'].iloc[0])
+            bbox=np.int64(np.ceil(bbox))
             # The image template that we need to match
             template=self.image[bbox[0][1]:bbox[1][1],bbox[0][0]:bbox[1][0]]
             w,h=template.shape[::-1]
@@ -137,7 +139,11 @@ class TemplateMatcher(DataGenerator):
         self.threshold=threshold
 
         # The provided box for the label
-        bbox=self.data[self.data['label']==label]["bbox"].iloc[0]
+        bbox=np.array(self.data[self.data['label']==label]["bbox"].iloc[0])
+        bbox=np.int64(np.ceil(bbox))
+        
+        
+        
 
         # Create the rotation angle spaces
         if_rotation=True
