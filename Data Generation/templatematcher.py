@@ -50,6 +50,7 @@ class TemplateMatcher(DataGenerator):
         self.image=np.asarray(self.rgb2gray(self.original_image),dtype=np.uint8)
 
         self.image_height,self.image_width=self.image.shape
+        
 
         # Obtaining The dataset
         self.data=json2csv.dataset
@@ -113,6 +114,11 @@ class TemplateMatcher(DataGenerator):
         for l in self.all_labels:
             bbox=np.array(self.data[self.data['label']==l]['bbox'].iloc[0])
             bbox=np.int64(np.ceil(bbox))
+            if bbox[0][1]>bbox[1][1]:
+                bbox=[[bbox[0][0],bbox[1][1]],[bbox[1][0],bbox[0][1]]]
+            if bbox[0][0]>bbox[1][0]:
+                bbox=[[bbox[1][0],bbox[0][1]],[bbox[0][0],bbox[1][1]]]
+
             # The image template that we need to match
             template=self.image[bbox[0][1]:bbox[1][1],bbox[0][0]:bbox[1][0]]
             w,h=template.shape[::-1]
@@ -141,7 +147,12 @@ class TemplateMatcher(DataGenerator):
         # The provided box for the label
         bbox=np.array(self.data[self.data['label']==label]["bbox"].iloc[0])
         bbox=np.int64(np.ceil(bbox))
-        
+        if bbox[0][1]>bbox[1][1]:
+            bbox=[[bbox[0][0],bbox[1][1]],[bbox[1][0],bbox[0][1]]]
+        if bbox[0][0]>bbox[1][0]:
+            bbox=[[bbox[1][0],bbox[0][1]],[bbox[0][0],bbox[1][1]]]
+
+        print(bbox)
         
         
 
@@ -169,6 +180,7 @@ class TemplateMatcher(DataGenerator):
         # INITIALIZING VARIABLE TO CREATE AND SELECT BOXES
         self.boxes=[]
         self.box_dict=dict()
+ 
 
         # Match Translation
         a,b=self.match(search_space,label,template)
@@ -615,7 +627,9 @@ if __name__=="__main__":
             tm.createJSON()
 
         
-
-    """tm=TemplateMatcher("/Users/ryzenx/Documents/Internship/Dataset/image1.json",slack_w=[0,0])
-    boxes=tm.match_template("1",0.25,1)
+if __name__=="__main__":
+    """tm=TemplateMatcher("/Users/ryzenx/Downloads/3.json",slack_w=[0,0])
+    boxes=tm.match_template("10",0.25,1)
     tm.plot(figsize=(10,10))"""
+    print("OK")
+    
