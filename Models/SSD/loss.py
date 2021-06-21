@@ -7,7 +7,7 @@ from PIL import Image
 from torch.autograd import Variable
 from box_utils import match, log_sum_exp,cxcy_to_gcxgcy,xy_to_cxcy,gcxgcy_to_cxcy
 from box_utils import match_ious, bbox_overlaps_iou, bbox_overlaps_giou, bbox_overlaps_diou, bbox_overlaps_ciou, decode,find_jaccard_overlap,cxcy_to_xy
-
+from box_utils import bbox_overlaps_eiou
 
 class FocalLoss(nn.Module):
     """
@@ -86,6 +86,8 @@ class IouLoss(nn.Module):
             else:
                 if self.loss == 'Diou':
                     loss = torch.sum(1.0 - bbox_overlaps_diou(decoded_boxes,loc_t))
+                elif self.loss=="Eiou":
+                    loss=torch.sum(1.0 - bbox_overlaps_eiou(decoded_boxes,loc_t))
                 else:
                     loss = torch.sum(1.0 - bbox_overlaps_ciou(decoded_boxes, loc_t))            
      
