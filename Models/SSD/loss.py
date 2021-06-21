@@ -144,6 +144,8 @@ class MultiBoxLoss(nn.Module):
             self.loss = IouLoss("Corner",size_sum=False,losstype="Giou")
         elif self.losstype=="diou":
             self.loss=IouLoss("Corner",size_sum=False,losstype="Diou")
+        elif self.losstype=="eiou":
+            self.loss=IouLoss("Corner",size_sum=False,losstype="Eiou")
         elif self.losstype=="ciou":
             self.loss=IouLoss("Corner",size_sum=False,losstype="Ciou")
         elif self.losstype=="l1+diou":
