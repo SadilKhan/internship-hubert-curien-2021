@@ -11,6 +11,58 @@ rev_label_map = {
     0: 'background'
 }"""
 
+def bbox_overlaps_eiou(bboxes1,bboxes2):
+    """ Efficient IOU Loss """
+    bboxes1=torch.clamp(bboxes1,min=0)
+    bboxes2=torch.clamp(bboxes2,min=0)
+
+    rows = bboxes1.shape[0]
+    cols = bboxes2.shape[0]
+    dious = torch.zeros((rows, cols))
+    if rows * cols == 0:
+        return dious
+    exchange = False
+    if bboxes1.shape[0] > bboxes2.shape[0]:
+        bboxes1, bboxes2 = bboxes2, bboxes1
+        dious = torch.zeros((cols, rows))
+        exchange = True
+
+    w1 = bboxes1[:, 2] - bboxes1[:, 0]
+    h1 = bboxes1[:, 3] - bboxes1[:, 1]
+    w2 = bboxes2[:, 2] - bboxes2[:, 0]
+    h2 = bboxes2[:, 3] - bboxes2[:, 1]
+
+    area1 = w1 * h1
+    area2 = w2 * h2
+    center_x1 = (bboxes1[:, 2] + bboxes1[:, 0]) / 2
+    center_y1 = (bboxes1[:, 3] + bboxes1[:, 1]) / 2
+    center_x2 = (bboxes2[:, 2] + bboxes2[:, 0]) / 2
+    center_y2 = (bboxes2[:, 3] + bboxes2[:, 1]) / 2
+
+    inter_max_xy = torch.min(bboxes1[:, 2:],bboxes2[:, 2:])
+    inter_min_xy = torch.max(bboxes1[:, :2],bboxes2[:, :2])
+    out_max_xy = torch.max(bboxes1[:, 2:],bboxes2[:, 2:]) # Bottom right corner of the enclosing box
+    out_min_xy = torch.min(bboxes1[:, :2],bboxes2[:, :2]) # Top left corner of the enclosing box
+    # Width of the Smallest enclosing box
+    C_w=(out_max_xy[:,0]-out_min_xy[:,0])
+    # Height of the smallest enclosing box
+    C_h=(out_max_xy[:,1]-out_min_xy[:,1])
+
+    inter = torch.clamp((inter_max_xy - inter_min_xy), min=0)
+    inter_area = inter[:, 0] * inter[:, 1]
+    inter_diag = (center_x2 - center_x1)**2 + (center_y2 - center_y1)**2
+    outer = torch.clamp((out_max_xy - out_min_xy), min=0)
+    outer_diag = (outer[:, 0] ** 2) + (outer[:, 1] ** 2)
+    union = area1+area2-inter_area
+    dious = inter_area / union - (inter_diag) / outer_diag
+    asp= torch.clamp((w2-w1)**2,min=0)/(C_w**2) + torch.clamp((h2-h1)**2,min=0)/(C_h**2)
+    eiou=dious-asp
+    #dious = torch.clamp(dious,min=-1.0,max = 1.0)
+    if exchange:
+        eiou = eiou.T
+    return eiou
+
+
 def bbox_overlaps_diou(bboxes1, bboxes2):
     """ Distance IOU """
 
