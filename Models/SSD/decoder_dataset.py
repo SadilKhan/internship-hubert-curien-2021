@@ -57,8 +57,6 @@ class DecoderDataset(Dataset):
             self.new_box = torch.cuda.FloatTensor(self.box_resize(self.box, img))
             if self.transform:
                 img = self.transform(img)
-            
-
             #self.labels=torch.FloatTensor(annotations['label'].values).cuda()
 
             """# Encode the labels with Int
@@ -114,13 +112,15 @@ class DecoderDataset(Dataset):
         # Transfer ssd style coordinates to xy coordinates
         self.__batch_size=self.locs.size(0)
         for i in range(self.__batch_size):
-          self.locs[i]=cxcy_to_xy(gcxgcy_to_cxcy(self.locs[i],self.detector.priors_cxcy.cpu()))
+          self.locs[i]=torch.clamp(cxcy_to_xy(gcxgcy_to_cxcy(self.locs[i],self.detector.priors_cxcy.cpu())),min=0,max=1)
 
         # Get all the feature maps
+        self.problem=0
         self.get_feature_maps(images) #(Batch Size, Num of Object, 5, 5)
-        self.make_single_box()
+        #self.transform_locations_tolist()
+        
 
-        return image_names,self.feature_map, self.locations,boxes  # tensor (N, 3, 300, 300),
+        return image_names, self.feature_map, self.locations,boxes,self.problem  # tensor (N, 3, 300, 300),
     
     def get_feature_maps(self,x):
       """ Get all the feature maps from the ssd detector"""
@@ -161,6 +161,7 @@ class DecoderDataset(Dataset):
       for i in range(self.__batch_size):
         sc_bx,cl_bx=self.classes[i].max(dim=1)
         un_cl=torch.unique(cl_bx)
+        #print(f"Batch {i}, Number of Obejcts {len(cl_bx)-len(cl_bx[cl_bx==0])}")
         # The locations of objects in every feature maps
         class_dict={}
         # The scores for the locations
@@ -171,17 +172,16 @@ class DecoderDataset(Dataset):
             new_bx_k=dict()
             score_for_k=dict()
             bx_k=(cl_bx==k).nonzero(as_tuple=True)[0].cpu()
+            #print(f"Batch : {i}, class {k}, Number {len(bx_k)}")
             for rp in list(self.__roi_pos_dict.keys()):
               min_,max_=self.__roi_pos_dict[rp]
               max_bx_k=bx_k[bx_k<max_]
               range_bx_k=max_bx_k[max_bx_k>=min_]
-              # Extract the feature m0ap name where positions belong
-              try:
-                locs_for_k=torch.clamp(self.locs[i][range_bx_k[torch.argmax(sc_bx[range_bx_k]).item()].item()],min=0,max=1)*self.feature_map_size[rp]
-                score_for_k[rp]=torch.max(sc_bx[range_bx_k]).item()
-                new_bx_k[rp]=locs_for_k.tolist()
-              except:
-                pass
+              range_bx_k=range_bx_k.tolist()
+              # Extract the feature map name where positions belong
+              if len(range_bx_k)>0:
+                new_bx_k[rp]=self.locs[i][range_bx_k].tolist()
+                score_for_k[rp]=sc_bx[range_bx_k].tolist()
             class_dict[k.cpu().item()]=new_bx_k
             score_dict[k.cpu().item()]=score_for_k
         locations.append(class_dict)
@@ -192,7 +192,7 @@ class DecoderDataset(Dataset):
     def merge_feature_maps(self):
       """ Merge the Fearure Maps for every object."""
       feature_map=[]
-      upsample=nn.Upsample((2560,5))
+      upsample=nn.Upsample((1024,5))
       for i in range(self.__batch_size):
         # Feature Maps for every Batch. Separate feature maps for separate images.
         feature_map_bt=[]
@@ -201,29 +201,30 @@ class DecoderDataset(Dataset):
           temp_ob=[]
           for fm in self.locations[i][ob].keys():
             roi=self.locations[i][ob][fm]
-            roi=[0]+roi
-            roi=torch.cuda.FloatTensor(roi).unsqueeze(0)
+            for j in range(len(roi)):
+              roi[j]=[0]+roi[j]
+            roi=torch.cuda.FloatTensor(roi)
             aligned_image=self.roialign(self.__feat_map_dict[fm],roi)
+            if aligned_image.size(1)<1024:
+              aligned_image=torch.moveaxis(aligned_image,1,2)
+              aligned_image=upsample(aligned_image)
+              aligned_image=torch.moveaxis(aligned_image,2,1)
             temp_ob.append(aligned_image)
-          
-          temp_ob=torch.moveaxis(torch.cat(temp_ob,dim=1),1,2)
-          temp_ob=upsample(temp_ob)
-          temp_ob=torch.moveaxis(temp_ob,2,1)
+            
+          temp_ob=torch.cat(temp_ob,dim=1)
           feature_map_bt.append(temp_ob)
         feature_map.append(torch.cat(feature_map_bt,dim=0))
       
       return feature_map
     
-    def make_single_box(self):
-      """ Some images have more than one boxes as they are captured in more than one feature maps. 
-      We need to take the one with maximum scores"""
-      for i,lc in enumerate(self.locations):
-        for j,ob in enumerate(lc.keys()):
-          
-          if len(list(lc[ob].keys()))>1:
-            represented_box=np.argmax(list(self.scores[i][ob].values()))
-            self.scores[i][ob]=np.max(list(self.scores[i][ob].values()))
-            lc[ob]=torch.tensor(lc[ob][list(lc[ob].keys())[represented_box]]).to("cuda")/self.feature_map_size[list(lc[ob].keys())[represented_box]]
+    def transform_locations_tolist(self):
+      for i in range(self.__batch_size):
+        for ob in self.locations[i].keys():
+          boxes=list(self.locations[i][ob].values())
+          if len(boxes)>1:
+            new_boxes=[]
+            for j in range(len(boxes)):
+              new_boxes+=boxes[j]
           else:
-            self.scores[i][ob]=list(self.scores[i][ob].values())[0]
-            lc[ob]=torch.tensor(lc[ob][list(lc[ob].keys())[0]]).to("cuda")/self.feature_map_size[list(lc[ob].keys())[0]]
+            new_boxes=boxes
+          self.locations[i][ob]=new_boxes
