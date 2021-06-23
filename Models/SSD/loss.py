@@ -144,10 +144,10 @@ class MultiBoxLoss(nn.Module):
             self.loss = IouLoss("Corner",size_sum=False,losstype="Giou")
         elif self.losstype=="diou":
             self.loss=IouLoss("Corner",size_sum=False,losstype="Diou")
-        elif self.losstype=="eiou":
-            self.loss=IouLoss("Corner",size_sum=False,losstype="Eiou")
         elif self.losstype=="ciou":
             self.loss=IouLoss("Corner",size_sum=False,losstype="Ciou")
+        elif self.losstype=="eiou":
+            self.loss=IouLoss("Corner",size_sum=False,losstype="Eiou")
         elif self.losstype=="l1+diou":
             self.loss1=nn.SmoothL1Loss()
             self.loss2=IouLoss("Corner",size_sum=False,losstype="Diou")
@@ -272,45 +272,46 @@ class MultiBoxLoss(nn.Module):
         return conf_loss + self.alpha * loc_loss
 
 class DecoderLoss(nn.Module):
-    """ Loss function for Decoder"""
-    def __init__(self,losstype="mse"):
-        super(DecoderLoss,self).__init__()
-        self.losstype="mse"
-        if self.losstype=="mse":
-            self.loss=nn.MSELoss()
+  def __init__(self,losstype="mse",resize_image_shape=(100,100)):
+    super(DecoderLoss,self).__init__()
+    self.losstype=losstype
+    if self.losstype=="mse":
+      self.loss=nn.MSELoss()
+    elif self.losstype=="bce":
+      self.loss=nn.BCELoss()
     
-    def forward(self,image_reconstructed,target_image,pred_loc,actual_loc):    
-        # Now we need to match the template of the reconstructed image with target image.
-        total_loss=[]
-        batch_size=len(pred_loc)
+    self.resize_image_shape=resize_image_shape
+  
+  def forward(self,image_reconstructed,target_image,pred_loc,actual_loc):    
+    # Now we need to match the template of the reconstructed image with target image.
+    total_loss=[]
+    batch_size=len(pred_loc)
 
-        for batch in range(batch_size):
-            loss_per_batch=0
-            get_overlap=find_jaccard_overlap(torch.stack(list(pred_loc[batch].values())),actual_loc[batch])
-            indices=get_overlap.max(dim=1)[1]
-            for k in range(len(indices)):
-                image=self.get_image(target_image[batch],actual_loc[batch][indices[k]])
-                image=self.resize_image(target_image[batch])
-                ls=self.loss(image_reconstructed[batch][k].to("cuda"),image.to("cuda"))
-                loss_per_batch+=ls
-            total_loss.append(loss_per_batch)
-        
-        loss=torch.mean(torch.stack(total_loss))
-        return loss
-
-        
-    def get_image(self,image,box):
-        box=torch.round(box*image.size(-1))
-        box=[int(b) for b in box.tolist()]
-        return image[box[1]:box[3],box[0]:box[2]]
+    for batch in range(batch_size):
+      loss_per_batch=0
+      get_overlap=find_jaccard_overlap(torch.stack(pred_loc[batch]).cuda(),actual_loc[batch])
+      indices=get_overlap.max(dim=1)[1]
+      indices=indices.tolist()
+      for k in range(len(indices)):
+        image=self.get_image(target_image[batch],actual_loc[batch][indices[k]])
+        image=self.resize_image(target_image[batch],self.resize_image_shape)
+        ls=self.loss(image_reconstructed[batch][k].to("cuda"),image.to("cuda"))
+        loss_per_batch+=ls
+      total_loss.append(loss_per_batch)
     
-    def resize_image(self,image,size=(100,100)):
-        transforms_pil=transforms.ToPILImage()
-        transforms_tensor=transforms.ToTensor()
+    loss=torch.mean(torch.stack(total_loss))
+    return loss
 
-        image=transforms_tensor(transforms_pil(image).resize(size,Image.NEAREST))
-        return image
-        
-    def forward(self,image_reconstructed,image_true):
-        loss=torch.mean(self.loss(image_reconstructed,image_true))
-        return loss     
+    
+  def get_image(self,image,box):
+    box=torch.round(box*640)
+    box=box.tolist()
+    box=[int(b) for b in box]
+    return image[box[1]:box[3],box[0]:box[2]]
+  
+  def resize_image(self,image,size=(100,100)):
+    transforms_pil=transforms.ToPILImage()
+    transforms_tensor=transforms.ToTensor()
+
+    image=transforms_tensor(transforms_pil(image).resize(size,Image.NEAREST))
+    return image 
