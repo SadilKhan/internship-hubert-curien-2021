@@ -117,10 +117,10 @@ class DecoderDataset(Dataset):
         # Get all the feature maps
         self.problem=0
         self.get_feature_maps(images) #(Batch Size, Num of Object, 5, 5)
-        #self.transform_locations_tolist()
+        self.transform_locations_tolist()
         
 
-        return image_names, self.feature_map, self.locations,boxes,self.problem  # tensor (N, 3, 300, 300),
+        return image_names, self.feature_map, self.locations,boxes  # tensor (N, 3, 300, 300),
     
     def get_feature_maps(self,x):
       """ Get all the feature maps from the ssd detector"""
@@ -180,7 +180,8 @@ class DecoderDataset(Dataset):
               range_bx_k=range_bx_k.tolist()
               # Extract the feature map name where positions belong
               if len(range_bx_k)>0:
-                new_bx_k[rp]=self.locs[i][range_bx_k].tolist()
+                locs_for_k_rp=self.locs[i][range_bx_k]
+                new_bx_k[rp]=locs_for_k_rp
                 score_for_k[rp]=sc_bx[range_bx_k].tolist()
             class_dict[k.cpu().item()]=new_bx_k
             score_dict[k.cpu().item()]=score_for_k
@@ -200,7 +201,8 @@ class DecoderDataset(Dataset):
           # Feature maps for every object. We will concatenate the feature maps
           temp_ob=[]
           for fm in self.locations[i][ob].keys():
-            roi=self.locations[i][ob][fm]
+            roi=self.locations[i][ob][fm]*self.feature_map_size[fm]
+            roi=roi.tolist()
             for j in range(len(roi)):
               roi[j]=[0]+roi[j]
             roi=torch.cuda.FloatTensor(roi)
@@ -211,7 +213,7 @@ class DecoderDataset(Dataset):
               aligned_image=torch.moveaxis(aligned_image,2,1)
             temp_ob.append(aligned_image)
             
-          temp_ob=torch.cat(temp_ob,dim=1)
+          temp_ob=torch.cat(temp_ob,dim=0)
           feature_map_bt.append(temp_ob)
         feature_map.append(torch.cat(feature_map_bt,dim=0))
       
@@ -219,12 +221,9 @@ class DecoderDataset(Dataset):
     
     def transform_locations_tolist(self):
       for i in range(self.__batch_size):
+        all_boxes=[]
         for ob in self.locations[i].keys():
           boxes=list(self.locations[i][ob].values())
-          if len(boxes)>1:
-            new_boxes=[]
-            for j in range(len(boxes)):
-              new_boxes+=boxes[j]
-          else:
-            new_boxes=boxes
-          self.locations[i][ob]=new_boxes
+          for j in range(len(boxes)):
+            all_boxes+=boxes[j]
+        self.locations[i]=all_boxes
