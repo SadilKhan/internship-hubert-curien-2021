@@ -272,7 +272,6 @@ class MultiBoxLoss(nn.Module):
         return conf_loss + self.alpha * loc_loss
 
 class DecoderLoss(nn.Module):
-    """ Custom MSE Loss for decoder"""
   def __init__(self,losstype="mse",resize_image_shape=(100,100)):
     super(DecoderLoss,self).__init__()
     self.losstype=losstype
