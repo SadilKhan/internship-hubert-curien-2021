@@ -128,17 +128,17 @@ class DecoderDataset(Dataset):
       self.rescale_factors = nn.Parameter(torch.cuda.FloatTensor(1, 512, 1, 1))  # there are 512 channels in conv4_3_feats
       # ROI Postions in Locs data Dictinary
       self.__roi_pos_dict={"conv4_3":[0,38*38],"conv7":[38*38,38*38+19*19],
-                  "conv8_2":[38*38+19*19,38*38+19*19+10*10],"conv9_2":[38*38+19*19+10*10,38*38+19*19+10*10+5*5],
-                  "conv10_2":[38*38+19*19+10*10+5*5, 38*38+19*19+10*10+5*5+3*3]}
+                  "conv8_2":[38*38+19*19,38*38+19*19+10*10],"conv9_2":[38*38+19*19+10*10,38*38+19*19+10*10+5*5]}
       self.feature_map_size={"conv4_3":38,"conv7":19,"conv8_2":10,"conv9_2":5,"conv10_2":3}
 
       # Get Conv4 and Conv7 from VGG
       self.conv4_3,self.conv7=self.detector.base(x)
 
-      # Rescale conv4_3 after L2 norm
+      """# Rescale conv4_3 after L2 norm
       norm = self.conv4_3.pow(2).sum(dim=1, keepdim=True).sqrt()  # (N, 1, 38, 38)
       self.conv4_3 = self.conv4_3 / norm  # (N, 512, 38, 38)
-      self.conv4_3 = self.conv4_3 * self.rescale_factors 
+      self.conv4_3 = self.conv4_3 * self.rescale_factors
+      self.conv4_3=torch.nan_to_num(self.conv4_3,nan=0)"""
 
       # Get rest of the feature maps from conv7
       self.conv8_2, self.conv9_2, self.conv10_2, self.conv11_2 = self.detector.aux_convs(self.conv7)
@@ -172,17 +172,20 @@ class DecoderDataset(Dataset):
             new_bx_k=dict()
             score_for_k=dict()
             bx_k=(cl_bx==k).nonzero(as_tuple=True)[0].cpu()
+            bx_k=bx_k[0].item()
+            #print(bx_k)
             #print(f"Batch : {i}, class {k}, Number {len(bx_k)}")
             for rp in list(self.__roi_pos_dict.keys()):
               min_,max_=self.__roi_pos_dict[rp]
-              max_bx_k=bx_k[bx_k<max_]
+              """max_bx_k=bx_k[bx_k<max_]
               range_bx_k=max_bx_k[max_bx_k>=min_]
-              range_bx_k=range_bx_k.tolist()
+              range_bx_k=range_bx_k.tolist()"""
               # Extract the feature map name where positions belong
-              if len(range_bx_k)>0:
-                locs_for_k_rp=self.locs[i][range_bx_k]
-                new_bx_k[rp]=locs_for_k_rp
-                score_for_k[rp]=sc_bx[range_bx_k].tolist()
+              if bx_k>=min_ and bx_k<=max_:
+                locs_for_k_rp=self.locs[i][bx_k]
+                #print(locs_for_k_rp)
+                new_bx_k[rp]=torch.clamp(locs_for_k_rp,min=0,max=1)
+                score_for_k[rp]=sc_bx[bx_k].tolist()
             class_dict[k.cpu().item()]=new_bx_k
             score_dict[k.cpu().item()]=score_for_k
         locations.append(class_dict)
@@ -193,7 +196,8 @@ class DecoderDataset(Dataset):
     def merge_feature_maps(self):
       """ Merge the Fearure Maps for every object."""
       feature_map=[]
-      upsample=nn.Upsample((1024,5))
+      upsample_roi=nn.Upsample((5,5))
+      upsample=nn.Upsample((1024,self.output_size[-1]))
       for i in range(self.__batch_size):
         # Feature Maps for every Batch. Separate feature maps for separate images.
         feature_map_bt=[]
@@ -201,17 +205,21 @@ class DecoderDataset(Dataset):
           # Feature maps for every object. We will concatenate the feature maps
           temp_ob=[]
           for fm in self.locations[i][ob].keys():
-            roi=self.locations[i][ob][fm]*self.feature_map_size[fm]
+            roi=self.locations[i][ob][fm]*(self.feature_map_size[fm]-1)
             roi=roi.tolist()
-            for j in range(len(roi)):
-              roi[j]=[0]+roi[j]
-            roi=torch.cuda.FloatTensor(roi)
+            roi=[0]+roi
+            roi=torch.round(torch.cuda.FloatTensor(roi))
+            roi=roi.unsqueeze(dim=0)
             aligned_image=self.roialign(self.__feat_map_dict[fm],roi)
+            sum_=torch.sum(torch.isnan(aligned_image))
+            if sum_.item()>0:
+              print(roi,fm,torch.sum(torch.isnan(self.__feat_map_dict[fm])))
+          
             if aligned_image.size(1)<1024:
               aligned_image=torch.moveaxis(aligned_image,1,2)
               aligned_image=upsample(aligned_image)
               aligned_image=torch.moveaxis(aligned_image,2,1)
-            temp_ob.append(aligned_image)
+            temp_ob.append(aligned_image.detach())
             
           temp_ob=torch.cat(temp_ob,dim=0)
           feature_map_bt.append(temp_ob)
@@ -220,10 +228,10 @@ class DecoderDataset(Dataset):
       return feature_map
     
     def transform_locations_tolist(self):
+      """ Transform the dictionary to lists of boxes"""
       for i in range(self.__batch_size):
         all_boxes=[]
         for ob in self.locations[i].keys():
           boxes=list(self.locations[i][ob].values())
-          for j in range(len(boxes)):
-            all_boxes+=boxes[j]
-        self.locations[i]=all_boxes
+          all_boxes.append(boxes[0])
+        self.locations[i]=torch.stack(all_boxes)
