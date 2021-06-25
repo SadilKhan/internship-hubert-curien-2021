@@ -272,6 +272,7 @@ class MultiBoxLoss(nn.Module):
         return conf_loss + self.alpha * loc_loss
 
 class DecoderLoss(nn.Module):
+    """ Custom MSE Loss for decoder"""
   def __init__(self,losstype="mse",resize_image_shape=(100,100)):
     super(DecoderLoss,self).__init__()
     self.losstype=losstype
@@ -286,32 +287,35 @@ class DecoderLoss(nn.Module):
     # Now we need to match the template of the reconstructed image with target image.
     total_loss=[]
     batch_size=len(pred_loc)
+    all_images=[]
 
     for batch in range(batch_size):
       loss_per_batch=0
-      get_overlap=find_jaccard_overlap(torch.stack(pred_loc[batch]).cuda(),actual_loc[batch])
-      indices=get_overlap.max(dim=1)[1]
-      indices=indices.tolist()
-      for k in range(len(indices)):
-        image=self.get_image(target_image[batch],actual_loc[batch][indices[k]])
-        image=self.resize_image(target_image[batch],self.resize_image_shape)
+      batch_images=[]
+      #get_overlap=find_jaccard_overlap(torch.stack(pred_loc[batch]).cuda(),actual_loc[batch])
+      #indices=get_overlap.max(dim=1)[1]
+      #indices=len(pred_loc[batch])
+      for k in range(len(pred_loc[batch])):
+        image=self.get_image(target_image[batch],pred_loc[batch][k])
+        image=self.resize_image(image,self.resize_image_shape)
+        batch_images.append(image)
         ls=self.loss(image_reconstructed[batch][k].to("cuda"),image.to("cuda"))
         loss_per_batch+=ls
+      all_images.append(batch_images)
       total_loss.append(loss_per_batch)
     
     loss=torch.mean(torch.stack(total_loss))
-    return loss
-
+    return loss,all_images
     
   def get_image(self,image,box):
     box=torch.round(box*640)
     box=box.tolist()
     box=[int(b) for b in box]
-    return image[box[1]:box[3],box[0]:box[2]]
+    return image[:,box[1]:box[3],box[0]:box[2]]
   
   def resize_image(self,image,size=(100,100)):
     transforms_pil=transforms.ToPILImage()
     transforms_tensor=transforms.ToTensor()
 
     image=transforms_tensor(transforms_pil(image).resize(size,Image.NEAREST))
-    return image 
+    return image
