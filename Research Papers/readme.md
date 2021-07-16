@@ -16,6 +16,7 @@
 
 # Blogs Read
 * [Understanding Region of Interest — (RoI Align and RoI Warp)](https://towardsdatascience.com/understanding-region-of-interest-part-2-roi-align-and-roi-warp-f795196fc193)
+* [Earth Mover's Distance](https://towardsdatascience.com/earth-movers-distance-68fff0363ef2)
 
 # Papers to Read
 
