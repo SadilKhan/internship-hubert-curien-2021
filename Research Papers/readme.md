@@ -13,6 +13,8 @@
 * [Mask RCNN](https://arxiv.org/pdf/1703.06870.pdf)
 * [DIOU LOSS](https://arxiv.org/abs/1911.08287)
 * [EIOU LOSS](https://arxiv.org/abs/2101.08158)
+* [DeepEMD](https://arxiv.org/pdf/2003.06777.pdf)
+* [SelfEMD](https://arxiv.org/abs/2011.13677)
 
 # Blogs Read
 * [Understanding Region of Interest — (RoI Align and RoI Warp)](https://towardsdatascience.com/understanding-region-of-interest-part-2-roi-align-and-roi-warp-f795196fc193)
