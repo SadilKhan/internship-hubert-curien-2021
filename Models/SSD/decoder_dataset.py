@@ -25,48 +25,36 @@ from box_utils import cxcy_to_gcxgcy,cxcy_to_xy,gcxgcy_to_cxcy,xy_to_cxcy,find_j
 
 
 class DecoderDataset(Dataset):
-    def __init__(self, detector,data, imageData, imageArray, is_test=False, transform=None,output_size=(5,5)):
+    def __init__(self, detector,data,directory, is_test=False, transform=None,output_size=(5,5),ssd_type=4):
         #self.annotation_folder_path = csv_path
         self.detector=detector # Object Detector
         self.data=data # Contains the information about bounding boxes
-        self.imageData=imageData # Contains the coordinate of the cropped images
-        self.imageArray=imageArray # Contains the arrays of the original 18 images
+        self.directory=directory # Contains the coordinate of the cropped images
         self.all_images=self.data['image_name'].unique()
         self.transform = transform
         self.is_test = is_test
         self.output_size=output_size
+        self.ssd_type=ssd_type # 4box SSD or 1
         # ROIALIGN
         self.roialign=RoIAlign(self.output_size,1,-1)
         
     def __getitem__(self, idx):
         img_name = self.all_images[idx]
-        if "_" in img_name:
-          original_img_name=img_name.split("_")[0]+".jpg"
-        else:
-          original_img_name=img_name
-        coord=self.imageData[self.imageData['image_name']==img_name][["x_min","y_min","x_max","y_max"]].values[0]
-        img = Image.fromarray(self.imageArray[self.imageArray['image_name']==original_img_name]['image_array'].values[0][
-            int(coord[1]):int(coord[3]),int(coord[0]):int(coord[2]),:])
+        img = Image.open(self.directory+"/"+img_name)
         img = img.convert('RGB')
         
+        annotations=self.data[self.data['image_name']==img_name]
+
+        self.box = self.get_xy(annotations)
+
+        self.new_box = self.box_resize(self.box, img)
+        if self.transform is not None:
+            img = self.transform(img)
         if not self.is_test:
-            annotations=self.data[self.data['image_name']==img_name]
-
-            self.box = self.get_xy(annotations)
-
-            self.new_box = torch.cuda.FloatTensor(self.box_resize(self.box, img))
-            if self.transform:
-                img = self.transform(img)
-            #self.labels=torch.FloatTensor(annotations['label'].values).cuda()
-
-            """# Encode the labels with Int
-            self.le=LabelEncoder()
-            self.labels=torch.FloatTensor(self.le.fit_transform(self.labels))"""
-
-            return img_name,img.cuda(), self.new_box
-            #return img_name,img,self.new_box
+            self.labels=torch.FloatTensor(annotations['label'].values).cuda()
+            return img_name,img.cuda(), self.new_box, self.labels
         else:
-            return img_name,img.cuda()
+            return img_name,img.cuda(),self.new_box,annotations["label"].values
     
     def __len__(self):
         return len(self.all_images)
@@ -90,23 +78,22 @@ class DecoderDataset(Dataset):
         :param batch: an iterable of N sets from __getitem__()
         :return: a tensor of images, lists of varying-size tensors of bounding boxes, labels, and difficulties
         """
-        image_names=list() # Name of the images
+        image_names=list()
         images = list()
         boxes = list()
         labels = list()
-#         difficulties = list()
 
         for b in batch:
-            image_names.append(b[0])
-            images.append(b[1])
-            boxes.append(b[2])
-            #labels.append(b[3])
-#             difficulties.append(b[3])
+          image_names.append(b[0])
+          images.append(b[1])
+          boxes.append(b[2])
+          labels.append(b[3])
 
         images = torch.stack(images, dim=0)
         # Get RoI's offset
         self.locs,self.classes=self.detector(images)
         self.classes=self.classes.cpu().detach()
+        self.classes=F.softmax(self.classes,dim=2)
         self.locs=self.locs.cpu().detach()
 
         # Transfer ssd style coordinates to xy coordinates
@@ -118,27 +105,30 @@ class DecoderDataset(Dataset):
         self.problem=0
         self.get_feature_maps(images) #(Batch Size, Num of Object, 5, 5)
         self.transform_locations_tolist()
-        
-
-        return image_names, self.feature_map, self.locations,boxes  # tensor (N, 3, 300, 300),
+        if self.is_test:
+          return image_names,self.feature_map,self.locations,boxes,labels,self.classes
+        else:
+          return image_names, self.feature_map, self.locations,boxes  # tensor (N, 3, 300, 300),
     
     def get_feature_maps(self,x):
       """ Get all the feature maps from the ssd detector"""
       
       self.rescale_factors = nn.Parameter(torch.cuda.FloatTensor(1, 512, 1, 1))  # there are 512 channels in conv4_3_feats
       # ROI Postions in Locs data Dictinary
-      self.__roi_pos_dict={"conv4_3":[0,38*38],"conv7":[38*38,38*38+19*19],
+      if self.ssd_type>1:
+        self.__roi_pos_dict={"conv4_3":[0,38*38*4],"conv7":[38*38*4,(38*38*4+19*19*6)],
+                    "conv8_2":[38*38*4+19*19*6,38*38*4+19*19*6+10*10*6],"conv9_2":[38*38*4+19*19*6+10*10*6,38*38*4+19*19*6+10*10*6+5*5*6,
+                    ],"conv10_2":[8692,38*38*4+19*19*6+10*10*6+5*5*6+3*3*4],"conv11_2":[8728,8733]}
+      else:
+        self.__roi_pos_dict={"conv4_3":[0,38*38],"conv7":[38*38,38*38+19*19],
                   "conv8_2":[38*38+19*19,38*38+19*19+10*10],"conv9_2":[38*38+19*19+10*10,38*38+19*19+10*10+5*5]}
-      self.feature_map_size={"conv4_3":38,"conv7":19,"conv8_2":10,"conv9_2":5,"conv10_2":3}
+                          
+      self.feature_map_size={"conv4_3":38,"conv7":19,"conv8_2":10,"conv9_2":5,"conv10_2":3,"conv11_2":1}
 
       # Get Conv4 and Conv7 from VGG
       self.conv4_3,self.conv7=self.detector.base(x)
 
-      """# Rescale conv4_3 after L2 norm
-      norm = self.conv4_3.pow(2).sum(dim=1, keepdim=True).sqrt()  # (N, 1, 38, 38)
-      self.conv4_3 = self.conv4_3 / norm  # (N, 512, 38, 38)
-      self.conv4_3 = self.conv4_3 * self.rescale_factors
-      self.conv4_3=torch.nan_to_num(self.conv4_3,nan=0)"""
+
 
       # Get rest of the feature maps from conv7
       self.conv8_2, self.conv9_2, self.conv10_2, self.conv11_2 = self.detector.aux_convs(self.conv7)
@@ -158,10 +148,27 @@ class DecoderDataset(Dataset):
       # Get the locations of objects in feature maps
       locations=[]
       scores=[]
+      self.used_locs=[]
       for i in range(self.__batch_size):
-        sc_bx,cl_bx=self.classes[i].max(dim=1)
+        if not self.is_test:
+          # Score per box and class per box
+          sc_bx,cl_bx=self.classes[i].max(dim=1)
+        else:
+          # For Test dataset, we will consider that a box has an object if the confidence score is more than 0.001.
+          ob_sc,ob_cl=self.classes[i][:,1:].max(dim=1)
+          ob_b_sc=ob_sc>0.001
+          sc_bx,cl_bx=[],[]
+          for j in range(len(ob_b_sc)):
+            if ob_b_sc[j]:
+              sc_bx.append(ob_sc[j])
+              cl_bx.append(ob_cl[j])
+            else:
+              sc_bx.append(1)
+              cl_bx.append(0)
+          sc_bx,cl_bx=torch.tensor(sc_bx),torch.tensor(cl_bx)
+
+        # Unique Classes
         un_cl=torch.unique(cl_bx)
-        #print(f"Batch {i}, Number of Obejcts {len(cl_bx)-len(cl_bx[cl_bx==0])}")
         # The locations of objects in every feature maps
         class_dict={}
         # The scores for the locations
@@ -173,24 +180,39 @@ class DecoderDataset(Dataset):
             score_for_k=dict()
             bx_k=(cl_bx==k).nonzero(as_tuple=True)[0].cpu()
             bx_k=bx_k[0].item()
-            #print(bx_k)
-            #print(f"Batch : {i}, class {k}, Number {len(bx_k)}")
-            for rp in list(self.__roi_pos_dict.keys()):
-              min_,max_=self.__roi_pos_dict[rp]
-              """max_bx_k=bx_k[bx_k<max_]
-              range_bx_k=max_bx_k[max_bx_k>=min_]
-              range_bx_k=range_bx_k.tolist()"""
-              # Extract the feature map name where positions belong
-              if bx_k>=min_ and bx_k<=max_:
-                locs_for_k_rp=self.locs[i][bx_k]
-                #print(locs_for_k_rp)
-                new_bx_k[rp]=torch.clamp(locs_for_k_rp,min=0,max=1)
-                score_for_k[rp]=sc_bx[bx_k].tolist()
-            class_dict[k.cpu().item()]=new_bx_k
-            score_dict[k.cpu().item()]=score_for_k
+            if cl_bx[bx_k]>=0:
+              #print(bx_k)
+              #print(f"Batch : {i}, class {k}, Number {len(bx_k)}")
+              for rp in list(self.__roi_pos_dict.keys()):
+                min_,max_=self.__roi_pos_dict[rp]
+                # Extract the feature map name where positions belong
+                if bx_k>=min_ and bx_k<=max_:
+                  locs_for_k_rp=self.locs[i][bx_k]
+                  if self.check_nms(locs_for_k_rp):
+                    #print(locs_for_k_rp)
+                    new_bx_k[rp]=torch.clamp(locs_for_k_rp,min=0,max=1)
+                    score_for_k[rp]=sc_bx[bx_k].tolist()
+              if len(list(new_bx_k.keys()))>0:
+                class_dict[k.cpu().item()]=new_bx_k
+                score_dict[k.cpu().item()]=score_for_k
         locations.append(class_dict)
         scores.append(score_dict)
       return locations,scores
+    
+    def check_nms(self,present_loc):
+      eligible=True
+      temp=self.used_locs
+      if self.used_locs==[]:
+        self.used_locs.append(present_loc)
+        return eligible
+      for i in range(len(self.used_locs)):
+        if find_jaccard_overlap(self.used_locs[i].unsqueeze(0),present_loc.unsqueeze(0))[0][0].item()>0.5:
+          eligible=False
+          break
+        else:
+          temp.append(present_loc)
+      self.used_locs=temp
+      return eligible
       
     
     def merge_feature_maps(self):
