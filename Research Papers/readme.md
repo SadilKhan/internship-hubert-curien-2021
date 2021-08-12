@@ -15,6 +15,8 @@
 * [EIOU LOSS](https://arxiv.org/abs/2101.08158)
 * [DeepEMD](https://arxiv.org/pdf/2003.06777.pdf)
 * [SelfEMD](https://arxiv.org/abs/2011.13677)
+* [Sinkhorn Distances:
+Lightspeed Computation of Optimal Transport](https://papers.nips.cc/paper/2013/file/af21d0c97db2e27e13572cbf59eb343d-Paper.pdf)
 
 # Blogs Read
 * [Understanding Region of Interest — (RoI Align and RoI Warp)](https://towardsdatascience.com/understanding-region-of-interest-part-2-roi-align-and-roi-warp-f795196fc193)
